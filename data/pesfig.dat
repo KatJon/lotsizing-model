@@ -1,0 +1,21 @@
+# time periods
+3 9
+# production periods
+0 0 0
+1 1 1
+9 9 9
+# lead time
+4
+1 1 2
+1 0 1
+# future periods
+## demand
+2 2 2 2 2 2
+## inventory
+1 1 1 1 1 1
+## backordering
+4 4 4 4 4 4
+# uncertainty
+GAMMA1 2
+# R* bound
+R* 49
