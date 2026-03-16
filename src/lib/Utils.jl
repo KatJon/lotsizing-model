@@ -6,10 +6,10 @@ import Gurobi
 export skip_first, skip_last
 
 "Return view of subarray first element."
-skip_first(itr::AbstractArray) = @view itr[2:end]
+skip_first(itr::AbstractArray) = @view itr[begin+1:end]
 
 "Return view of subarray skipping last element."
-skip_last(itr::AbstractArray) = @view itr[1:end-1]
+skip_last(itr::AbstractArray) = @view itr[begin:end-1]
 
 "Pretty print an array without type information."
 print_array(as::AbstractArray) = "[" * join(as, ",") * "]"

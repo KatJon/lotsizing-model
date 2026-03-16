@@ -7,11 +7,17 @@ include("lib/Instance.jl")
 include("lib/Parse.jl")
 include("lib/graph/OptGraph.jl")
 include("lib/graph/PesGraph.jl")
-include("lib/Model.jl")
+include("lib/model/Model.jl")
+include("lib/model/PseudoPoly.jl")
+include("lib/model/SAA.jl")
+include("lib/gen/GenInstance.jl")
 
 export Utils, Instance, Parse
 export OptGraph, PesGraph
 export Model
+export PseudoPoly
+export SAA
+export GenInstance
 
 import JuMP
 

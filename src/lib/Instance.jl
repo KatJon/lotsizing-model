@@ -341,23 +341,23 @@ function valid_budget_usage(inst::LotSizingInstance, arr)
     throw("compute_budget_usage: Unhandled uncertainty type: $(type)")
 end #valid_budget_usage
 
-function valid_arrival(inst, arr)
-    for (l,r) in zip(arr, arr[1:end])
+function valid_arrival(inst, arr, ignore_budget::Bool)
+    for (l,r) in zip(arr, arr[2:end])
         if l > r return false end
     end
 
-    return valid_budget_usage(inst, arr)
+    return ignore_budget || valid_budget_usage(inst, arr)
 end #valid_arrival
 
 
-function list_scenarios(inst::LotSizingInstance)
+function list_scenarios(inst::LotSizingInstance;ignore_budget::Bool=false)
     l = inst.common_lead_time
     ranges = [(t+l-early):(t+l+late) for (early,late,t) in
         zip(inst.early_deviation, inst.late_deviation, 1:inst.T)]
 
     possible_arrivals = reshape(collect(Base.product(ranges...)), :)
 
-    return [arr for arr in possible_arrivals if valid_arrival(inst, arr)]
+    return [collect(arr) for arr in possible_arrivals if valid_arrival(inst, arr, ignore_budget)]
 end #list_scenarios
 
 end #Instance

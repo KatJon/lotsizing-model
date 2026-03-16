@@ -1,17 +1,11 @@
+module DirectModel
+
 import LotsizingModel as LM
 
 import .LM.Instance
 using .LM.Utils
 
 using JuMP, Gurobi
-
-function create_gurobi()
-    env = Gurobi.Env(Dict{String,Any}(
-        "OutputFlag" => 0
-    ))
-
-    return Gurobi.Optimizer(env)
-end
 
 function opt_model(inst::Instance.LotSizingInstance)
     model = JuMP.Model(create_gurobi)
@@ -156,3 +150,5 @@ function run_direct_models(path)
 
     opt_model(instance)
 end #run_direct_models
+
+end #module DirectModel

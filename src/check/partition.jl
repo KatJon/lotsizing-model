@@ -9,7 +9,21 @@ using Printf
 using OffsetArrays: Origin
 using Random
 
-function gen_partition(N::Int, k::Int; rng=Xoshiro())
+"""
+Generate an instance for partition problem.
+Arguments:
+* N - number of items
+* k - maximal size of item
+* rng - optional, random number generator instance
+
+Returns a sorted vector of items
+"""
+function gen_partition(
+    N::Int,
+    k::Int,
+    ;
+    rng::AbstractRNG=Xoshiro()
+)
     X = zeros(Int, N)
     while true
         rand!(rng, X, 1:k)
@@ -20,39 +34,64 @@ function gen_partition(N::Int, k::Int; rng=Xoshiro())
     return sort(X)
 end
 
-function solve_partition_basic(A::Vector{Int})
-    N = length(A)
-    if N % 2 == 1 throw("Number of items is not even") end
+# """
+# Solve partition problem using pseudopolynomial algorithm. This version doesn't check for the balanced number of items in solution.
 
-    SUM = sum(A)
-    if SUM % 2 == 1 throw("Sum of data is not even") end
-    S = Int64(SUM/2)
+# Arguments:
+# * A - vector of sorted items
 
-    store = Origin(0)(zeros(Bool, N+1, S+1))
+# Preconditions:
+# * A is nondecreasing
 
-    for i in 0:N
-        for j in 0:S
-            if i == 0 store[i,j] = false end
-            if j == 0 store[i,j] = true end
-        end
-    end
+# Returns: binary vector of selected items
+# """
+# function solve_partition_basic(A::Vector{Int})
+#     N = length(A)
+#     if N % 2 == 1 throw("Number of items is not even") end
 
-    for i in 1:N
-        for j in 1:S
-            if data[i] > j
-                store[i,j] = store[i-1, j]
-            else
-                inclusion = store[i-1,j-A[i]]
-                exclusion = store[i-1,j]
+#     SUM = sum(A)
+#     if SUM % 2 == 1 throw("Sum of data is not even") end
+#     S = Int64(SUM/2)
 
-                store[i,j] = inclusion || exclusion
-            end
-        end
-    end
+#     store = Origin(0)(zeros(Bool, N+1, S+1))
 
-    return store[N,S]
-end
+#     for i in 0:N
+#         for j in 0:S
+#             if i == 0 store[i,j] = false end
+#             if j == 0 store[i,j] = true end
+#         end
+#     end
 
+#     for i in 1:N
+#         for j in 1:S
+#             if data[i] > j
+#                 store[i,j] = store[i-1, j]
+#             else
+#                 inclusion = store[i-1,j-A[i]]
+#                 exclusion = store[i-1,j]
+
+#                 store[i,j] = inclusion || exclusion
+#             end
+#         end
+#     end
+
+#     return store[N,S]
+# end
+
+"""
+Solve partition problem (with constraint on selecting half of the items) using pseudopolynomial algorithm.
+
+Arguments:
+* A - vector of sorted items
+
+Preconditions:
+* A is nondecreasing
+
+Returns: tuple of
+    * boolean flag denoting if the solution was found
+    * vector of selected items or nothing if there is no solution
+    * binary vector of selected items or nothing if there is no solution
+"""
 function solve_partition_balanced(A::Vector{Int})
     N = length(A)
     if N % 2 == 1 throw("Number of items is not even") end
@@ -98,6 +137,14 @@ function solve_partition_balanced(A::Vector{Int})
     return true, SOL, idA
 end
 
+"""
+Create an R* LotSizing instance from the Partition instance.
+
+Arguments:
+* A - nondecreasing vector of items
+
+Returns: R*LotSizing instance
+"""
 function build_instance_from_partition(A::Vector{Int})
     if !issorted(A) throw("Input array is assumed to be sorted") end
 
@@ -169,6 +216,7 @@ function build_partition_model(env::Gurobi.Env, A::Vector{Int})
 end
 
 function partition_from_rmodel(A, model)
+    #TODO: fix objective by rounding (answers need to be integer)
     obj = JuMP.objective_value(model)
 
     half = Int64(sum(A) / 2)
@@ -213,6 +261,20 @@ function test_single()
     println("Far future backordering: $(JuMP.value(far_future_backordering))")
 end
 
+"""
+Conduct an experiment validating the correctness of the reduction from Partition problem.
+
+Arguments:
+* rep - number of repetitions (default 100)
+* N - number of items in problem (defualt 10)
+* size - maximal size of items (default N*N)
+
+Returns: tuple of
+* number of tests passing
+* number of all tests
+* number of yes-instances (based on DP solutions)
+* number of no-instances
+"""
 function test_mult(;rep=100,N=10,size=N*N)
     env = mkEnv()
     yes = 0
@@ -231,7 +293,9 @@ function test_mult(;rep=100,N=10,size=N*N)
 
         if okDP yes += 1 else no += 1 end
 
-        if okDP == okR pass += 1 else
+        if okDP == okR
+            pass += 1
+        else
             println("*** ***")
             println(A)
             println([JuMP.value(x[i]) for i in 1:N])
@@ -245,4 +309,6 @@ function test_mult(;rep=100,N=10,size=N*N)
 
     println("Yes-instances: $(yes)")
     println("No-instances: $(no)")
+
+    return pass, rep, yes, no
 end
