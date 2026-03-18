@@ -7,30 +7,8 @@ import Random
 using JuMP, Gurobi
 
 export
-    sample_arrivals,
     received_orders,
     create_SAA_model
-
-"""
-Create a vector of samples of arrival times based on an instance.
-
-Arguments:
-* inst - LotSizingInstance,
-* N - number of sample scenarios.
-Optional arguments:
-* seed - seed to RNG engine,
-* ignore_budget - sample the full uncertainty set ignoring the budget imposed in the instance.
-
-Returns: vector of vectors of arrival times.
-"""
-function sample_arrivals(inst::LotSizingInstance, N::Int; seed=nothing, ignore_budget=false)
-    rng = Random.Xoshiro(seed)
-    scenarios = Instance.list_scenarios(inst;ignore_budget)
-
-    println("No. of scenarios=$(length(scenarios))")
-
-    return [scenarios[Random.rand(rng, 1:length(scenarios))] for _ in 1:N]
-end #sample_leadtimes
 
 """
 Calculate the vector of received quantities.

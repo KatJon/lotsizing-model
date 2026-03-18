@@ -42,11 +42,11 @@ end #generate_vector_int
 Structure describing the ranges of the non-leadtime parameters for instance generation.
 """
 struct InstanceParameters
-    # production period parameters
+    # production periods
     production_cost :: Tuple{Int, Int}
     setup_cost :: Tuple{Int, Int}
     production_capacity :: Tuple{Int, Int}
-    # future_periods
+    # future periods
     demand :: Tuple{Int,Int}
     inventory_cost :: Tuple{Int, Int}
     backordering_cost :: Tuple{Int, Int}
@@ -101,11 +101,15 @@ function generate_leadtimes(
     for t in 1:T
         # t + common + late <= Tplus
         # late <= Tplus - t - common
-        late_deviation[t] = min(common_late, max(0, Tplus - t - common_lead_time))
+        late_bound = Tplus - t - common_lead_time
+        if late_bound < 0 throw("No feasible late deviation for t=$(t)") end
+        late_deviation[t] = min(common_late, late_bound)
         
         # t + common - early >= T + 1
         # early <= t + common - T - 1
-        early_deviation[t] = min(common_early,max(0, t+common_lead_time-T-1))
+        early_bound = t+common_lead_time-T-1
+        if early_bound < 0 throw("No feasible early deviation for t=$(t)") end
+        early_deviation[t] = min(common_early, early_bound)
     end
 
     return common_lead_time, late_deviation, early_deviation

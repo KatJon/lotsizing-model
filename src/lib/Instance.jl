@@ -3,13 +3,17 @@ module Instance
 
 using Memoization
 
+import Random
+
 export LotSizingInstance,
     prod_periods, future_periods,
     lead_min, lead_max,
     feasible_lead_times, feasible_arrival_times,
     cumulative_demand,
     may_arrive_by, must_arrive_by,
-    Uncertainty
+    Uncertainty,
+    sample_arrivals,
+    prod_lead_cost
 
 """
 Provides type definitions for uncertainty modelling
@@ -124,20 +128,29 @@ function save_instance(
 
         # production periods
         write(file, "# production periods\n")
+        write(file, "## setup cost\n")
         write_array(file, inst.setup_cost)
+        write(file, "## production cost\n")
         write_array(file, inst.production_cost)
+        write(file, "## production capacity\n")
         write_array(file, inst.production_capacity)
-
+        
         # lead time characterization
         write(file, "# lead time\n")
+        write(file, "## common lead time\n")
         write(file, "$(inst.common_lead_time)\n")
+        write(file, "## late deviation\n")
         write_array(file, inst.late_deviation)
+        write(file, "## early deviation\n")
         write_array(file, inst.early_deviation)
-
+        
         # future periods
         write(file, "# future periods\n")
+        write(file, "## demand\n")
         write_array(file, inst.demand)
+        write(file, "## inventory cost\n")
         write_array(file, inst.inventory_cost)
+        write(file, "## backordering cost\n")
         write_array(file, inst.backordering_cost)
 
         # uncertainty
@@ -359,5 +372,26 @@ function list_scenarios(inst::LotSizingInstance;ignore_budget::Bool=false)
 
     return [collect(arr) for arr in possible_arrivals if valid_arrival(inst, arr, ignore_budget)]
 end #list_scenarios
+
+"""
+Create a vector of samples of arrival times based on an instance.
+
+Arguments:
+* inst - LotSizingInstance,
+* N - number of sample scenarios.
+Optional arguments:
+* seed - seed to RNG engine,
+* ignore_budget - sample the full uncertainty set ignoring the budget imposed in the instance.
+
+Returns: vector of vectors of arrival times.
+"""
+function sample_arrivals(inst::LotSizingInstance, N::Int; seed=nothing, ignore_budget=false)
+    rng = Random.Xoshiro(seed)
+    scenarios = Instance.list_scenarios(inst;ignore_budget)
+
+    println("No. of scenarios=$(length(scenarios))")
+
+    return [scenarios[Random.rand(rng, 1:length(scenarios))] for _ in 1:N]
+end #sample_arrivals
 
 end #Instance

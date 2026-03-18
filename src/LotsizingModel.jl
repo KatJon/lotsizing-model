@@ -10,6 +10,7 @@ include("lib/graph/PesGraph.jl")
 include("lib/model/Model.jl")
 include("lib/model/PseudoPoly.jl")
 include("lib/model/SAA.jl")
+include("lib/model/Hurwicz.jl")
 include("lib/gen/GenInstance.jl")
 
 export Utils, Instance, Parse
