@@ -1,9 +1,7 @@
-module DirectModel
+module MipModel
 
-import LotsizingModel as LM
-
-import .LM.Instance
-using .LM.Utils
+import ..Instance
+using ..Utils
 
 using JuMP, Gurobi
 
@@ -151,4 +149,4 @@ function run_direct_models(path)
     opt_model(instance)
 end #run_direct_models
 
-end #module DirectModel
+end #MipModel

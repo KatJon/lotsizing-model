@@ -25,6 +25,7 @@ end
 function experimentR(
     inst::LotSizingInstance,
     ;
+    name=nothing,
     Gamma1=nothing,
     Gamma2=nothing,
 )
@@ -40,7 +41,7 @@ function experimentR(
     pes_bound = pes_value(inst)
 
     RN = 64
-    bounds=collect(LinRange(opt_bound, pes_bound, RN))
+    bounds=collect(LinRange(opt_bound, 1.5*pes_bound, RN))
 
     println("opt=$(opt_bound) pes=$(pes_bound)")
 
@@ -73,9 +74,9 @@ function experimentR(
         solvetime[i] = solve_time(model)
     end
 
-    cost_plot = plt.plot(bounds, results; legend_position=:outerright)
+    cost_plot = plt.Plot()
+    plt.plot!(cost_plot, bounds, results; markershape=:circle,)
     plt.plot!(cost_plot, bounds, bounds)
-    plt.scatter!(cost_plot, bounds, results)
     plt.vline!(cost_plot,[opt_bound,pes_bound])
     plt.title!(cost_plot, "R* cost")
     plt.gui(cost_plot)
@@ -86,11 +87,28 @@ function experimentR(
     # plt.scatter!(time_plot, rs, solvetime)
     # plt.title!(time_plot, "Solve time")
     # plt.gui(time_plot)
+
+    if isnothing(name)
+        plt.gui(cost_plot)
+    else
+        plt.savefig(cost_plot, "fig/$(name)_R.png")
+    end
 end
 
 function hurwicz(
     inst::LotSizingInstance,
+    ;
+    name=nothing,
+    Gamma1=nothing,
+    Gamma2=nothing,
 )
+    if !isnothing(Gamma1)
+        @reset inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma1, Gamma1)
+    end
+    
+    if !isnothing(Gamma2)
+        @reset inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma2, Gamma2)
+    end
     alphas = collect(LinRange(0.0,1.0,50))
     
     results = zeros(length(alphas))
@@ -110,8 +128,14 @@ function hurwicz(
         solvetime[i] = solve_time(model)
     end
 
-    cost_plot = plt.plot(alphas, results; legend_position=:outerright)
+    cost_plot = plt.Plot()
+    plt.plot!(cost_plot, alphas, results; markershape=:circle)
     plt.scatter!(cost_plot, alphas, results)
     plt.title!(cost_plot, "Hurwicz cost")
-    plt.gui(cost_plot)
+
+    if isnothing(name)
+        plt.gui(cost_plot)
+    else
+        plt.savefig(cost_plot, "fig/$(name)_hurwicz.png")
+    end
 end

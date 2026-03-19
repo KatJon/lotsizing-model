@@ -11,6 +11,8 @@ include("lib/model/Model.jl")
 include("lib/model/PseudoPoly.jl")
 include("lib/model/SAA.jl")
 include("lib/model/Hurwicz.jl")
+include("lib/model/Deterministic.jl")
+include("lib/model/MipModel.jl")
 include("lib/gen/GenInstance.jl")
 
 export Utils, Instance, Parse
