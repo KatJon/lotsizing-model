@@ -3,6 +3,7 @@ module LotsizingModel
 
 # Order of includes is significant
 include("lib/Utils.jl")
+include("lib/StatUtils.jl")
 include("lib/Instance.jl")
 include("lib/Parse.jl")
 include("lib/graph/OptGraph.jl")
