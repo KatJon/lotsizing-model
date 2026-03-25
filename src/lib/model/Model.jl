@@ -284,7 +284,7 @@ function create_R_model(
 
     far_future_backordering = flow[isnode(ograph), ivnode(ograph, inst.Tplus)]
 
-    return model,x,rho,z,y,pgraph,far_future_backordering
+    return model,x,y,rho,z,pgraph,far_future_backordering
 end
 
 end # module

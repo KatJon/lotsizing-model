@@ -100,7 +100,7 @@ function run_R_model(instance::Instance.LotSizingInstance)
         println("Missing R* bound")
     end
     println("R* bound: $(instance.rbound)")
-    @time model,x,rho,z,y,pgraph = Model.create_R_model(instance)
+    @time model,x,y,rho,z,pgraph = Model.create_R_model(instance)
 
     JuMP.optimize!(model)
 

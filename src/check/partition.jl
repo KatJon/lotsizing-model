@@ -210,7 +210,7 @@ function build_partition_model(env::Gurobi.Env, A::Vector{Int})
 
     instance = build_instance_from_partition(A)
 
-    model,x,rho,_,_,_,far_future_backordering = LM.Model.create_R_model(instance,make_optimizer=mkGurobi)
+    model,x,_,rho,_,_,far_future_backordering = LM.Model.create_R_model(instance,make_optimizer=mkGurobi)
 
     return instance,model,x,far_future_backordering,rho
 end

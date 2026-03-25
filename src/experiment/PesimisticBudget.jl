@@ -197,8 +197,6 @@ function histG1(
 
     println("Preparing plots")
     @showprogress for (gamma,costs) in zip(gammas, all_costs)
-
-
         hist = StatUtils.mkhist(amin, amax, costs, k)
         hist = Float64.(hist)
         hist ./= Float64(N)
@@ -217,7 +215,7 @@ function histG1(
     if isnothing(name)
         plt.gui(allhist)
     else
-        plt.savefig("fig/$(name)_hist.png")
+        plt.savefig("fig/$(name)_pesG1_hist.png")
     end
 end
 
@@ -228,13 +226,11 @@ function heatmapG1(
     name=nothing,
     force=false,
 )
-    tmpname = isnothing(name) ? "TMP" : name
-    SAVEFILE="output/$(tmpname)_heatmapG1_$(N).csv"
-    
-
     gammas = 0:inst.T
 
     mkpath("output")
+    tmpname = isnothing(name) ? "TMP" : name
+    SAVEFILE="output/$(tmpname)_heatmapG1_$(N).csv"
     all_costs = StatUtils.with_file_cache(SAVEFILE; force=force) do 
         samples = sample_arrivals(inst, N;ignore_budget=true)
         costs = zeros(Float64, length(gammas), length(samples))
@@ -269,7 +265,9 @@ function heatmapG1(
 
     hist ./= N
 
-    cont = plt.contourf(cutoffs[begin:end-1], gammas, hist, levels=20, color=:turbo, lw=0)
+    cont = plt.contourf(cutoffs[begin:end-1], gammas, hist,
+        levels=30, 
+        color=plt.cgrad(:turbo, scale=:exp), lw=0)
     plt.title!(cont, "Simulated cost (minmax model)")
     plt.xlabel!(cont, "cost")
     plt.ylabel!(cont, "\$\\Gamma_1\$")
