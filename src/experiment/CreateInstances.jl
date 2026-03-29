@@ -2,7 +2,15 @@ import LotsizingModel as LM
 
 using .LM.GenInstance
 
+"""
+Generate an instance for LotSizing Problem
 
+Arguments:
+* T - number of production periods
+* Tplus - number of all periods (production + future)
+
+Returns: LotSizingInstance
+"""
 function single_instance(T::Int, Tplus::Int)
     MAX_DEMAND = 750
     CAPACITY = cld((Tplus-T)*MAX_DEMAND, T)

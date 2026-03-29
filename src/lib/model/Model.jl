@@ -157,7 +157,7 @@ function create_opt_model(
     
     far_future_backordering = flow[isnode(graph), ivnode(graph, inst.Tplus)]
     
-    return model, x, rho, far_future_backordering, flow, y, graph
+    return model, x, y, rho, far_future_backordering, flow, graph
 end #create_opt_model
 
 function create_pes_variables(inst, model, graph)

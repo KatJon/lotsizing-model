@@ -6,6 +6,7 @@ include("lib/Utils.jl")
 include("lib/StatUtils.jl")
 include("lib/Instance.jl")
 include("lib/Parse.jl")
+include("lib/ExperimentUtils.jl")
 include("lib/graph/OptGraph.jl")
 include("lib/graph/PesGraph.jl")
 include("lib/model/Model.jl")
@@ -73,7 +74,7 @@ end #run_pes_model
 
 function run_opt_model(instance::Instance.LotSizingInstance; compute_pesobj=false)
     println("Building opt model")
-    @time model,x,rho,far_future_backordering = Model.create_opt_model(instance)
+    @time model,x,_,rho,far_future_backordering = Model.create_opt_model(instance)
 
     JuMP.optimize!(model)
 

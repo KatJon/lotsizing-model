@@ -13,7 +13,9 @@ export LotSizingInstance,
     may_arrive_by, must_arrive_by,
     Uncertainty,
     sample_arrivals,
-    prod_lead_cost
+    prod_lead_cost,
+    sample_interval_arrivals,
+    max_gamma2_budget
 
 """
 Provides type definitions for uncertainty modelling
@@ -101,7 +103,16 @@ struct LotSizingInstance
     rbound :: Union{Nothing, Float64}
 end #LotSizingInstance
 
-"Save instance to a file"
+"""
+Save LotSizingInstance to a file.
+
+Arguments:
+* inst - instance to be saved
+* path - path to file
+Optional arguments:
+* name - instance name to add to header
+* author - author name to add to header
+"""
 function save_instance(
     inst::LotSizingInstance,
     path::String
@@ -363,7 +374,7 @@ function valid_arrival(inst, arr, ignore_budget::Bool)
 end #valid_arrival
 
 
-function list_scenarios(inst::LotSizingInstance;ignore_budget::Bool=false)
+@memoize function list_scenarios(inst::LotSizingInstance;ignore_budget::Bool=false)
     l = inst.common_lead_time
     ranges = [(t+l-early):(t+l+late) for (early,late,t) in
         zip(inst.early_deviation, inst.late_deviation, 1:inst.T)]
@@ -374,7 +385,7 @@ function list_scenarios(inst::LotSizingInstance;ignore_budget::Bool=false)
 end #list_scenarios
 
 """
-Create a vector of samples of arrival times based on an instance.
+Create a vector of samples of arrival times based on an instance. Creates list of all arrivals to sample from
 
 Arguments:
 * inst - LotSizingInstance,
@@ -385,13 +396,60 @@ Optional arguments:
 
 Returns: vector of vectors of arrival times.
 """
-function sample_arrivals(inst::LotSizingInstance, N::Int; seed=nothing, ignore_budget=false)
+function sample_arrivals(
+    inst::LotSizingInstance,
+    N::Int,
+    ;
+    seed=nothing,
+    ignore_budget=false,
+    all_scenarios=nothing,
+)
     rng = Random.Xoshiro(seed)
-    scenarios = Instance.list_scenarios(inst;ignore_budget)
-
-    println("No. of scenarios=$(length(scenarios))")
+    scenarios = !isnothing(all_scenarios) ? all_scenarios :
+        Instance.list_scenarios(inst;ignore_budget)
 
     return [scenarios[Random.rand(rng, 1:length(scenarios))] for _ in 1:N]
 end #sample_arrivals
+
+function _sample_single_arrival(
+    rng::Random.AbstractRNG,
+    inst::LotSizingInstance,
+    feasible_arrivals::Vector{Vector{Int}},
+)
+    arrivals = zeros(Int, inst.T)
+
+    prev = nothing
+
+    for t in 1:inst.T
+        interval = isnothing(prev) ? feasible_arrivals[t] :
+            filter(v -> v >= prev, feasible_arrivals[t])
+        
+        prev = arrivals[t] = rand(rng, interval)
+        
+    end
+    
+    if !valid_arrival(inst,arrivals,true)
+        println("invalid arrival")
+    end
+
+    return arrivals
+end
+
+function sample_interval_arrivals(
+    inst::LotSizingInstance,
+    N::Int,
+    ;
+    seed=nothing,
+)
+    rng = Random.Xoshiro(seed)
+    feasible_arrivals = [feasible_arrival_times(inst, t) for t in 1:inst.T]
+
+    return [_sample_single_arrival(rng, inst, feasible_arrivals) for _ in 1:N]
+end
+
+@memoize function max_gamma2_budget(inst::LotSizingInstance)
+    return sum(max(inst.early_deviation[t], inst.late_deviation[t])
+        for t in 1:inst.T)
+end
 
 end #Instance
