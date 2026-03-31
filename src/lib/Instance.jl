@@ -107,8 +107,9 @@ end #LotSizingInstance
 Save LotSizingInstance to a file.
 
 Arguments:
-* inst - instance to be saved
-* path - path to file
+* inst - instance to be saved,
+* path - path to file.
+
 Optional arguments:
 * name - instance name to add to header
 * author - author name to add to header
@@ -288,7 +289,6 @@ Compute vector of the numbers of deliveries that may arrive in future periods:
     ]
 end
 
-
 """
 Check if the instance satisfies the assumptions made in the article.
 """
@@ -315,6 +315,18 @@ function validate_instance(
     return errors
 end #validate_instance
 
+"""
+Compute the cost of production plan `x` (production quantity), `y` (production setup)
+under arrival times vector `arrival`.
+
+Arguments:
+* inst - LotSizingInstance,
+* x - vector of production quantity,
+* y - vector of production setup,
+* arrival - vector of arrival times.
+
+Returns: cost of plan `(x,y)` under arrival times `arrival`
+"""
 function prod_lead_cost(inst::LotSizingInstance, x, y, arrival)
     (;T) = inst
     production = sum(inst.production_cost[t] * x[t] for t in prod_periods(inst))
@@ -342,7 +354,7 @@ function validate_gamma1(arr, common_lead, gamma)
             for (p,t) in enumerate(arr); init=0)
 
     return usage <= gamma
-end
+end #validate_gamma1
 
 function validate_gamma2(arr, common_lead, gamma)
     usage = sum(
@@ -350,7 +362,7 @@ function validate_gamma2(arr, common_lead, gamma)
             for (p,t) in enumerate(arr); init=0)
 
     return usage <= gamma
-end
+end #validate_gamma2
 
 function valid_budget_usage(inst::LotSizingInstance, arr)
     (;type) = inst.uncertainty
@@ -390,9 +402,11 @@ Create a vector of samples of arrival times based on an instance. Creates list o
 Arguments:
 * inst - LotSizingInstance,
 * N - number of sample scenarios.
+
 Optional arguments:
-* seed - seed to RNG engine,
-* ignore_budget - sample the full uncertainty set ignoring the budget imposed in the instance.
+* seed - (default: nothing) seed to RNG engine,
+* ignore_budget - (default: nothing) sample the full uncertainty set ignoring the budget imposed in the instance,
+* all_scenarios - (default: nothing) list of all scenarios to be used instead of computing them
 
 Returns: vector of vectors of arrival times.
 """
@@ -427,7 +441,7 @@ function _sample_single_arrival(
         prev = arrivals[t] = rand(rng, interval)
         
     end
-    
+
     if !valid_arrival(inst,arrivals,true)
         println("invalid arrival")
     end
@@ -447,6 +461,9 @@ function sample_interval_arrivals(
     return [_sample_single_arrival(rng, inst, feasible_arrivals) for _ in 1:N]
 end
 
+"""
+Compute maximal possible Gamma2 budget usage in an instance.
+"""
 @memoize function max_gamma2_budget(inst::LotSizingInstance)
     return sum(max(inst.early_deviation[t], inst.late_deviation[t])
         for t in 1:inst.T)

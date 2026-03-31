@@ -3,6 +3,8 @@ module Parse
 
 using ..Instance
 
+export parse_instance
+
 function get_next_line(file::IOStream)::String
     while true
         line = readline(file)
@@ -111,6 +113,16 @@ function parse_rbound(
     throw("Unexpected error parsing R* bound")
 end #parse_rbound
 
+"""
+Parse `file` into LotSizing problem instance.
+
+In case of wrong formatting or syntax error an exception is thrown.
+
+Arguments:
+* file - file to be parsed.
+
+Returns: LotSizingInstance
+"""
 function parse_instance(
     file::IOStream,
 )::LotSizingInstance

@@ -1,3 +1,4 @@
+__precompile__(true)
 module ExperimentUtils
 
 using ..Instance
@@ -32,6 +33,7 @@ end
 function with_rbound(inst::LotSizingInstance, rbound)
     return @set inst.rbound=rbound
 end
+
 """
 Perform experiment by cases.
 
@@ -67,12 +69,17 @@ function case_experiment(
 end #case_experiment
 
 """
-Plot histograms for gathered data
+Plot histograms for gathered data.
 
 Arguments:
-*
+* amin, amax - minimal and maximal values in `all_data`,
+* nbuckets - number of buckets,
+* nsamples - number of sample points,
+* cases - vector of cases to plot,
+* all_data - sampled data.
+
 Optional arguments:
-* mktitle - function to set title
+* mktitle - function to set title based on case parameter
 
 Returns: vector of plots
 """

@@ -1,3 +1,4 @@
+__precompile__(true)
 module MipModel
 
 import ..Instance

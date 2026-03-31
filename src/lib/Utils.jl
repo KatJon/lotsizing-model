@@ -4,6 +4,8 @@ module Utils
 import Gurobi
 
 export skip_first, skip_last
+export create_gurobi
+export findfirstvalue
 
 "Return view of subarray first element."
 skip_first(itr::AbstractArray) = @view itr[begin+1:end]
@@ -27,4 +29,18 @@ function create_gurobi()
 
     return Gurobi.Optimizer(env)
 end #create_gurobi
+
+"""
+Find first value in `itr` satisfying predicate `pred`.
+"""
+function findfirstvalue(pred, itr)
+    idx = findfirst(pred, itr)
+
+    if isnothing(idx)
+        return nothing
+    end
+
+    return itr[idx]
+end #findfirstvalue
+
 end #Utils

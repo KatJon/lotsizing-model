@@ -1,7 +1,8 @@
+__precompile__(true)
 module SAA
 
-using ..Instance
 import ..Utils
+using ..Instance
 
 import Random
 using JuMP, Gurobi

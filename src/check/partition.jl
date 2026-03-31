@@ -5,6 +5,7 @@ import .LM.Instance.Uncertainty
 
 using JuMP, Gurobi
 
+using ProgressMeter
 using Printf
 using OffsetArrays: Origin
 using Random
@@ -33,50 +34,6 @@ function gen_partition(
 
     return sort(X)
 end
-
-# """
-# Solve partition problem using pseudopolynomial algorithm. This version doesn't check for the balanced number of items in solution.
-
-# Arguments:
-# * A - vector of sorted items
-
-# Preconditions:
-# * A is nondecreasing
-
-# Returns: binary vector of selected items
-# """
-# function solve_partition_basic(A::Vector{Int})
-#     N = length(A)
-#     if N % 2 == 1 throw("Number of items is not even") end
-
-#     SUM = sum(A)
-#     if SUM % 2 == 1 throw("Sum of data is not even") end
-#     S = Int64(SUM/2)
-
-#     store = Origin(0)(zeros(Bool, N+1, S+1))
-
-#     for i in 0:N
-#         for j in 0:S
-#             if i == 0 store[i,j] = false end
-#             if j == 0 store[i,j] = true end
-#         end
-#     end
-
-#     for i in 1:N
-#         for j in 1:S
-#             if data[i] > j
-#                 store[i,j] = store[i-1, j]
-#             else
-#                 inclusion = store[i-1,j-A[i]]
-#                 exclusion = store[i-1,j]
-
-#                 store[i,j] = inclusion || exclusion
-#             end
-#         end
-#     end
-
-#     return store[N,S]
-# end
 
 """
 Solve partition problem (with constraint on selecting half of the items) using pseudopolynomial algorithm.
@@ -212,15 +169,16 @@ function build_partition_model(env::Gurobi.Env, A::Vector{Int})
 
     model,x,_,rho,_,_,far_future_backordering = LM.Model.create_R_model(instance,make_optimizer=mkGurobi)
 
+    set_integer.(x)
+
     return instance,model,x,far_future_backordering,rho
 end
 
 function partition_from_rmodel(A, model)
-    #TODO: fix objective by rounding (answers need to be integer)
     obj = JuMP.objective_value(model)
 
     half = Int64(sum(A) / 2)
-    println("$(@sprintf("%.8f",obj-half))")
+
     return isapprox(obj, half)
 end #partition_from_rmodel
 
@@ -275,14 +233,14 @@ Returns: tuple of
 * number of yes-instances (based on DP solutions)
 * number of no-instances
 """
-function test_mult(;rep=100,N=10,size=N*N)
+function test_mult(;rep=100,N=10,size=N*N,verbose=false)
     env = mkEnv()
     yes = 0
     no = 0
 
     pass = 0
 
-    for i in 1:rep
+    @showprogress for i in 1:rep
         A = gen_partition(N, size)
         okDP,ADP = solve_partition_balanced(A)
 
@@ -296,13 +254,17 @@ function test_mult(;rep=100,N=10,size=N*N)
         if okDP == okR
             pass += 1
         else
-            println("*** ***")
-            println(A)
-            println([JuMP.value(x[i]) for i in 1:N])
-            println("*** ***")
+            if verbose
+                println("*** ***")
+                println(A)
+                println([JuMP.value(x[i]) for i in 1:N])
+                println("*** ***")
+            end
         end
 
-        println("$(i) $(okDP ? 1 : 0) $(okR ? 1 : 0)")
+        if verbose
+            println("$(i) $(okDP ? 1 : 0) $(okR ? 1 : 0)")
+        end
     end
 
     println("Pass: $(pass) ($(round(100*pass/rep,digits=2))%)")
