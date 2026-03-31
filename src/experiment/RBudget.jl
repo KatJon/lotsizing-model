@@ -255,6 +255,49 @@ function sampling_R_Gamma1(
     end
 end
 
+function cost_RG1(
+    inst::LotSizingInstance,
+    ;
+    name=nothing,
+)
+    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
+    pes_bound = pes_value(inst_interval)
+    
+    gammas = 0:inst.T
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 5)
+    plots = []
+
+    for (i,rbound) in enumerate(rbounds)
+        println("R* bound $(i)")
+        inst1 = @set inst.rbound=rbound
+
+        results = zeros(length(gammas))
+
+        case_experiment(inst1, gammas,
+            with_gamma1,
+            LM.Model.create_R_model
+        ) do i,model,_,_
+            results[i] = objective_value(model)
+        end
+
+        cost_plot = make_cost_plot(gammas, results;
+            title="R* cost \$\\Gamma_1\$ (b=$(@sprintf "%.2e" rbound))",
+            ylabel="cost",
+            xlabel="\$\\Gamma\$",
+        )
+
+        push!(plots, cost_plot)
+    end
+
+    allplots = plt.plot(plots...; layout=length(rbounds), size=(2000,1000))
+
+    if isnothing(name)
+        println("Can't show multiple plots interactively.")
+    else
+        plt.savefig(allplots, "fig/$(name)_RG1_cost.png")
+    end
+end
+
 function sample_RG1(
     inst::LotSizingInstance,
     ;
@@ -367,6 +410,9 @@ function experiments(name,path)
     inst = LM.load_instance(path)
 
     N = 10000
+
+    println("### Cost Gamma1")
+        cost_RG1(inst; name=name)
 
     println("### Sample Gamma1")
         sample_RG1(inst; name=name, N=N)
