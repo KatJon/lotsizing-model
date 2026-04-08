@@ -7,7 +7,7 @@ using JuMP
 
 export create_common_variables
 
-function create_common_variables(inst, model)
+function create_common_variables(inst::LotSizingInstance, model)
     @variable(model,
         y[t=prod_periods(inst)], Bin)
 

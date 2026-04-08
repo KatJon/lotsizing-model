@@ -36,7 +36,7 @@ function opt_objective(inst, graph, flow, y)
     )
 end #opt_objective
 
-function opt_constraints(inst, model, graph, M, rho, flow, x)
+function opt_constraints(inst, model, graph, rho, flow, x)
     # (43)
     @constraint(model, [t=prod_periods(inst)],
         sum(rho[t,j] for j in feasible_arrival_times(inst, t)) == 1)
@@ -78,8 +78,10 @@ function opt_constraints(inst, model, graph, M, rho, flow, x)
     # (47)
     for t in prod_periods(inst)
         for j in feasible_arrival_times(inst, t)
+            u = OptG.iunode(graph, t)
+            v = OptG.ivnode(graph, j)
             @constraint(model,
-                flow[OptG.iunode(graph, t), OptG.ivnode(graph, j)] <= rho[t,j] * M)
+                flow[u,v] <= rho[t,j] * inst.production_capacity[t])
         end
     end
 
@@ -116,8 +118,6 @@ function create_opt_model(
     model = JuMP.Model(make_optimizer)
     set_attribute(model, "TimeLimit", time_limit)
 
-    M = sum(inst.production_capacity[t] for t in prod_periods(inst))
-
     graph = OptG.create_opt_graph(inst)
 
     ## Variables
@@ -129,15 +129,41 @@ function create_opt_model(
         opt_objective(inst, graph, flow, y))
 
     ## Constraints (43)-(48)
-    opt_constraints(inst, model, graph, M, rho, flow, x)
+    opt_constraints(inst, model, graph, rho, flow, x)
 
     # (49)
     @constraint(model, [t=prod_periods(inst)],
-        x[t] <= M * y[t])
+        x[t] <= inst.production_capacity[t] * y[t])
     
     far_future_backordering = flow[OptG.isnode(graph), OptG.ivnode(graph, inst.Tplus)]
     
     return model, x, y, rho, far_future_backordering, flow, graph
 end #create_opt_model
+
+function opt_scenario_cost(
+    inst::LotSizingInstance,
+    xs::Vector{Float64},
+    ;
+    make_optimizer = Utils.create_gurobi,
+    time_limit = 5*60,
+)
+    model = JuMP.Model(make_optimizer)
+    set_attribute(model, "TimeLimit", time_limit)
+
+    ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
+
+    graph = OptG.create_opt_graph(inst)
+    
+    ## Variables
+    rho,flow = create_opt_variables(inst, model, graph)
+
+    ## Objective
+    @objective(model, Min,
+        opt_objective(inst, graph, flow, ys))
+
+    opt_constraints(inst, model, graph, rho, flow, xs)
+
+    return model
+end #opt_scenario_cost
 
 end #OptModel

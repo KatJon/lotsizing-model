@@ -1,85 +1,145 @@
 __precompile__(true)
 module MipModel
 
-import ..Instance
+using ..Instance
 using ..Utils
+
+using ..CommonModel
 
 using JuMP, Gurobi
 
-function opt_model(inst::Instance.LotSizingInstance)
-    model = JuMP.Model(create_gurobi)
+function time_periods(inst::LotSizingInstance)
+    tprod = 1:inst.T
+    tfut = 1:inst.Tplus-inst.T
 
-    (;T,Tplus) = inst
+    return tprod,tfut
+end
 
-    tprod = 1:T
-    tfut = 1:Tplus-T
-
-    M = sum(inst.production_capacity)
-
-    @variable(model, 0 <= x[t=tprod] <= inst.production_capacity[t])
-    @variable(model, y[tprod], Bin)
-
-    @constraint(model, [t=tprod], x[t] <= M*y[t])
+function opt_variables(
+    inst::LotSizingInstance,
+    model::Model,
+)
+    tprod,tfut = time_periods(inst)
 
     @variable(model, B[tfut] >= 0)
     @variable(model, I[tfut] >= 0)
-    
-    D = cumsum(inst.demand)
+    @variable(model, rho[p=tprod,f=tfut], Bin)
+    @variable(model, fl[p=tprod,t=tfut] >= 0)
+
+    return B,I,rho,fl
+end
+
+function opt_constraints(
+    inst::LotSizingInstance,
+    model::Model,
+    x, y, B, I, rho, fl,
+)
+    tprod,tfut = time_periods(inst)
+
+    # production can happen only after setup
+    @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
+
+    # lead time modelling
+    LEAD = inst.common_lead_time
+    earliest_arr(p) = p + LEAD - inst.early_deviation[p]
+    latest_arr(p) = p + LEAD + inst.late_deviation[p]
+
+    ## production arrives fully
+    @constraint(model, [p=tprod], sum(rho[p, f] for f in tfut) == 1)
+
+    (;T) = inst
+    ## production cannot arrive before the earliest possible time
+    @constraint(model, [p=tprod,t=tfut; T+t<earliest_arr(p)], rho[p,t] == 0)
+    ## production cannot arrive after the latest possible time
+    @constraint(model, [p=tprod,t=tfut; T+t>latest_arr(p)], rho[p,t] == 0)
+
+    ## the arrivals may not cross-over (order of arrival is the same as order of production)
+    (;T) = inst
+    @constraint(model, [tp=skip_last(tprod),j=tfut,k=tfut; k < j &&
+        (earliest_arr(tp) <= T+j <= latest_arr(tp)) &&
+        (earliest_arr(tp+1) <= T+k <= latest_arr(tp+1))],
+            rho[tp,j] + rho[tp+1,k] <= 1
+    )
+
+    # Uncertainty budget constraints
+    ## Gamma1
+    if inst.uncertainty.type == Uncertainty.Gamma1
+        @constraint(model, 
+            inst.uncertainty.gamma >= sum(rho[tp,tf-T] for
+                tp in tprod,
+                tf in earliest_arr(tp):latest_arr(tp)
+                if tf != tp + inst.common_lead_time
+            )
+        )
+    end
+
+    ## Gamma2
+    if inst.uncertainty.type == Uncertainty.Gamma2
+        @constraint(model,
+            inst.uncertainty.gamma >= sum(
+                abs(tf - tp - inst.common_lead_time) * rho[tp,tf] for
+                    tp in tprod,
+                    tf in earliest_arr(tp):latest_arr(tp)
+            )
+        )
+    end
+
+    # production flows only in periods where it is arriving
+    @constraint(model, [tp=tprod,tf=tfut], fl[tp,tf] <= inst.production_capacity[tp]*rho[tp,tf])
+
+    # production flow is equal to production
+    @constraint(model, [tp=tprod], sum(fl[tp,tf] for tf in tfut) == x[tp])
+
+    X = [sum(fl[tp,t1] for tp in tprod, t1 in 1:tf) for tf in tfut]
+    D = cumulative_demand(inst)
+    for t in tfut
+        # inventory balance constraint
+        @constraint(model, B[t] - I[t] == D[t] - X[t])
+    end
+end
+
+function opt_objective(
+    inst::LotSizingInstance,
+    x, y, B, I,
+)
+    tprod,tfut = time_periods(inst)
 
     cS = inst.setup_cost
     cP = inst.production_cost
     cI = inst.inventory_cost
     cB = inst.backordering_cost
 
-    @objective(model, Min,
+    return (
         sum(y[t]*cS[t] + x[t]*cP[t] for t in tprod) +
-        sum(I[t]*cI[t] + B[t]*cB[t] for t in tfut))
-    
-    # lead time modelling
-    @variable(model, rho[p=tprod,f=tfut], Bin)
-
-    LEAD = inst.common_lead_time
-
-    earliest_arr(p) = p + LEAD - inst.early_deviation[p]
-    latest_arr(p) = p + LEAD + inst.late_deviation[p]
-
-    ## production arrives once
-    @constraint(model, [p=tprod], sum(rho[p, f] for f in tfut) == 1)
-
-    @constraint(model, [p=tprod,t=tfut; T+t<earliest_arr(p)], rho[p,t] == 0)
-    @constraint(model, [p=tprod,t=tfut; T+t>latest_arr(p)], rho[p,t] == 0)
-
-    @constraint(model, [p=skip_last(tprod),j=tfut,k=tfut; k < j &&
-        (earliest_arr(p) <= T+j <= latest_arr(p)) &&
-        (earliest_arr(p+1) <= T+k <= latest_arr(p+1))],
-            rho[p,j] + rho[p+1,k] <= 1
+        sum(I[t]*cI[t] + B[t]*cB[t] for t in tfut)
     )
+end
 
-    @variable(model, fl[p=tprod,t=tfut] >= 0)
-    @constraint(model, [p=tprod,t=tfut], fl[p,t] <= M*rho[p,t])
-    @constraint(model, [p=tprod], sum(fl[p,t] for t in tfut) == x[p])
+"""
+Create direct MIP model for the min-min problem.
 
-    X = [sum(fl[p,t1] for p in tprod, t1 in 1:t) for t in tfut]
+Arguments:
+* inst - LotSizingInstance
+"""
+function opt_model(inst::LotSizingInstance)
+    model = JuMP.Model(create_gurobi)
 
-    for t in tfut
-        @constraint(model, B[t] - I[t] == D[t] - X[t])
-    end
+    tprod,tfut = time_periods(inst)
 
-    JuMP.optimize!(model)
+    x,y = create_common_variables(inst, model)
 
-    println("Opt=$(JuMP.objective_value(model))")
+    B,I,rho,fl = opt_variables(inst, model)
 
-    for t in Instance.prod_periods(inst)
-        println("x[$(t)] => $(JuMP.value(x[t]))")
-    end
+    opt_constraints(inst, model, x, y, B, I, rho, fl)
 
-    println("Far future backordering: $(JuMP.value.(B[Tplus-T]))")
+    @objective(model, Min, opt_objective(inst, x, y, B, I))
+
+    return model,x,y
 end #opt_model
 
 function prod_lead_cost_var(inst, model, x, y, zi, zb, arrival)
-    (;T,Tplus) = inst
-    tprod = 1:T
-    tfut = 1:Tplus-T
+    (;T) = inst
+    tprod,tfut = time_periods(inst)
 
     production = sum(inst.production_cost[t] * x[t] for t in tprod)
     setup = sum(inst.setup_cost[t] * y[t] for t in tprod)
@@ -87,7 +147,7 @@ function prod_lead_cost_var(inst, model, x, y, zi, zb, arrival)
     X = [sum(x[p] for p in tprod if arrival[p] <= t+T; init=0) 
         for t in tfut]
     
-    D = Instance.cumulative_demand(inst)
+    D = cumulative_demand(inst)
     @constraint(model, [t=tfut], 
         zi[t] >= inst.inventory_cost[t]*(X[t] - D[t]))
     @constraint(model, [t=tfut], 
@@ -99,27 +159,35 @@ function prod_lead_cost_var(inst, model, x, y, zi, zb, arrival)
     return production + setup + inventory + backordering
 end #prod_lead_cost_var
 
-function pes_model(inst::Instance.LotSizingInstance)
-    model = JuMP.Model(create_gurobi)
-
-    (;T,Tplus) = inst
-
-    tprod = 1:T
-    tfut = 1:Tplus-T
-    
-    @variable(model, 0 <= x[t=tprod] <= inst.production_capacity[t])
-    @variable(model, y[tprod], Bin)
-    
-    M = sum(inst.production_capacity)
-    @constraint(model, [t=tprod], x[t] <= M*y[t])
-
-    scenarios = Instance.list_scenarios(inst)
-    NS = length(scenarios)
+function pes_variables(
+    inst::LotSizingInstance,
+    model::Model,
+    NS::Int,
+)
+    _,tfut = time_periods(inst)
 
     @variable(model, zmax >= 0)
     @variable(model, z[1:NS] >= 0)
     @variable(model, zi[1:NS,tfut] >= 0)
     @variable(model, zb[1:NS,tfut] >= 0)
+
+    return zmax,z,zi,zb
+end #pes_variables
+
+function pes_model(inst::LotSizingInstance)
+    model = JuMP.Model(create_gurobi)
+
+    tprod,tfut = time_periods(inst)
+    
+    x,y = create_common_variables(inst, model)
+    
+    @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
+
+    scenarios = Instance.list_scenarios(inst)
+    NS = length(scenarios)
+
+    zmax,z,zi,zb = pes_variables(inst, model, NS)
+
     for (i,scen) in enumerate(scenarios)
         @constraint(model,
             prod_lead_cost_var(inst, model,
@@ -129,17 +197,15 @@ function pes_model(inst::Instance.LotSizingInstance)
 
     @objective(model, Min, zmax)
 
-    print(model)
+    return model,x,y
+end
 
-    JuMP.optimize!(model)
+function R_model(inst::LotSizingInstance)
+    model = JuMP.Model(create_gurobi)
 
-    println(JuMP.solution_summary(model))
+    tprod,tfut = time_periods(inst)
 
-    println("Pes=$(JuMP.objective_value(model))")
-
-    for t in Instance.prod_periods(inst)
-        println("x[$(t)] => $(JuMP.value(x[t]))")
-    end
+    return model,x,y
 end
 
 function run_direct_models(path)

@@ -23,9 +23,7 @@ function create_R_model(
     end
     model = JuMP.Model(make_optimizer)
     set_attribute(model, "TimeLimit", time_limit)
-
-    M = sum(inst.production_capacity[t] for t in prod_periods(inst))
-
+    
     ograph = OptG.create_opt_graph(inst)
     pgraph = PesG.create_pes_graph(inst)
 
@@ -48,11 +46,11 @@ function create_R_model(
     PesModel.pes_constraints(inst, model, pgraph, z, x)
 
     # (43)-(48)
-    OptModel.opt_constraints(inst, model, ograph, M, rho, flow, x)
+    OptModel.opt_constraints(inst, model, ograph, rho, flow, x)
 
     # (38) & (49)
     @constraint(model, [t=prod_periods(inst)],
-        x[t] <= M * y[t])
+        x[t] <= inst.production_capacity[t] * y[t])
 
     far_future_backordering = flow[OptG.isnode(ograph), OptG.ivnode(ograph, inst.Tplus)]
 

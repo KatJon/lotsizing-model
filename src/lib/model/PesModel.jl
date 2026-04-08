@@ -68,8 +68,6 @@ function create_pes_model(
 )
     model = JuMP.Model(make_optimizer)
     set_attribute(model, "TimeLimit", time_limit)
-
-    M = sum(inst.production_capacity[t] for t in prod_periods(inst))
     
     graph = PesG.create_pes_graph(inst)
 
@@ -88,9 +86,37 @@ function create_pes_model(
 
     # (38)
     @constraint(model, [t=prod_periods(inst)],
-        x[t] <= M * y[t])
+        x[t] <= inst.production_capacity[t] * y[t])
 
     return model,x,y,z,graph
 end #create_pes_model
+
+function pes_scenario_cost(
+    inst::LotSizingInstance,
+    xs::Vector{Float64},
+    ;
+    make_optimizer = Utils.create_gurobi,
+    time_limit = 5*60,
+)
+    model = JuMP.Model(make_optimizer)
+    set_attribute(model, "TimeLimit", time_limit)
+    
+    ys = [x > 0 ? 1.0 : 0.0 for x in xs]
+
+    graph = PesG.create_pes_graph(inst)
+
+    ## Variables
+    z = create_pes_variables(inst, model, graph)
+
+    ## Objective
+    @objective(model, Min,
+        pes_objective(inst, graph, z, xs, ys)
+    )
+
+    ## Constraints
+    pes_constraints(inst, model, graph, z, xs)
+
+    return model
+end #pes_scenario_cost
 
 end #PesModel

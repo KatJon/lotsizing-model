@@ -6,7 +6,6 @@ include("lib/Utils.jl")
 include("lib/StatUtils.jl")
 include("lib/Instance.jl")
 include("lib/Parse.jl")
-include("lib/ExperimentUtils.jl")
 include("lib/graph/OptGraph.jl")
 include("lib/graph/PesGraph.jl")
 include("lib/model/CommonModel.jl")
@@ -20,6 +19,7 @@ include("lib/model/Hurwicz.jl")
 include("lib/model/Deterministic.jl")
 include("lib/model/MipModel.jl")
 include("lib/gen/GenInstance.jl")
+include("lib/ExperimentUtils.jl")
 
 export Utils, Instance, Parse
 export OptGraph, PesGraph
