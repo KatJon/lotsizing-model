@@ -15,6 +15,38 @@ using DelimitedFiles
 using Printf
 using Statistics
 
+function solveR(inst; Gamma1=nothing, Gamma2=nothing, rbound=nothing)
+    if !isnothing(Gamma1)
+        @reset inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma1, Gamma1)
+    end
+    
+    if !isnothing(Gamma2)
+        @reset inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma2, Gamma2)
+    end
+
+    if !isnothing(rbound)
+        @reset inst.rbound=rbound
+    end
+
+    model,x,y = LM.Model.create_R_model(inst)
+
+    optimize!(model)
+
+    if !is_solved_and_feasible(model)
+        pmodel,px,py = LM.Model.create_pes_model(inst)
+        optimize!(pmodel)
+
+        if !is_solved_and_feasible(pmodel)
+            println("Pes Model infeasible.")
+            return
+        end
+
+        return objective_value(pmodel),px,py
+    end
+
+    return objective_value(model),x,y
+end
+
 function hist_hurwicz(
     inst::LotSizingInstance,
     ;

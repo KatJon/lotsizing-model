@@ -114,7 +114,7 @@ function sample_pesG1(inst::LotSizingInstance; N=1000, name=nothing)
     minbound = zeros(length(gammas))
     maxbound = zeros(length(gammas))
 
-    samples = sample_arrivals(inst, N)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     case_experiment(inst, gammas,
         with_gamma1,
@@ -158,7 +158,7 @@ function sample_pesG2(inst::LotSizingInstance;N=1000,name=nothing)
     minbound = zeros(length(gammas))
     maxbound = zeros(length(gammas))
 
-    samples = sample_arrivals(inst, N)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     case_experiment(inst, gammas,
         with_gamma2,
@@ -199,7 +199,7 @@ function sample_optG1(inst::LotSizingInstance; N=1000, name=nothing)
     minbound = zeros(length(gammas))
     maxbound = zeros(length(gammas))
 
-    samples = sample_arrivals(inst, N)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     case_experiment(inst, gammas,
         with_gamma1,
@@ -243,7 +243,7 @@ function sample_optG2(inst::LotSizingInstance; N=1000, name=nothing)
     minbound = zeros(length(gammas))
     maxbound = zeros(length(gammas))
 
-    samples = sample_arrivals(inst, N)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     case_experiment(inst, gammas,
         with_gamma2,
@@ -285,7 +285,7 @@ function hist_pesG1(
     name=nothing,
 )
     gammas = 0:inst.T
-    samples = sample_arrivals(inst, N)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     all_costs = []
 
@@ -309,6 +309,7 @@ function hist_pesG1(
         gammas,
         all_costs;
         mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
+        rescale=true,
     )
 
     allhist = plt.plot(plots...; layout=length(gammas), size=(2000,1000))
@@ -327,7 +328,7 @@ function hist_optG1(
     name=nothing,
 )
     gammas = 0:inst.T
-    samples = sample_arrivals(inst, N)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     all_costs = []
 
@@ -351,6 +352,7 @@ function hist_optG1(
         gammas,
         all_costs;
         mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
+        rescale=true,
     )
 
     allhist = plt.plot(plots...; layout=length(gammas), size=(2000,1000))
@@ -403,5 +405,5 @@ end #experiments
 function run()
     mkpath("fig")
     experiments("10_21_1", "data/gen/10_21_1.dat")
-    # experiments("10_41_1", "data/gen/10_41_1.dat")
+    experiments("10_41_1", "data/gen/10_41_1.dat")
 end #run

@@ -1,6 +1,7 @@
 import LotsizingModel as LM
 
 import .LM.StatUtils
+import .LM.RModel
 using .LM.Instance
 using .LM.ExperimentUtils
 
@@ -26,38 +27,6 @@ function pes_value(inst::LotSizingInstance)
     optimize!(model)
 
     return objective_value(model)
-end
-
-function solveR(inst; Gamma1=nothing, Gamma2=nothing, rbound=nothing)
-    if !isnothing(Gamma1)
-        @reset inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma1, Gamma1)
-    end
-    
-    if !isnothing(Gamma2)
-        @reset inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma2, Gamma2)
-    end
-
-    if !isnothing(rbound)
-        @reset inst.rbound=rbound
-    end
-
-    model,x,y = LM.Model.create_R_model(inst)
-
-    optimize!(model)
-
-    if !is_solved_and_feasible(model)
-        pmodel,px,py = LM.Model.create_pes_model(inst)
-        optimize!(pmodel)
-
-        if !is_solved_and_feasible(pmodel)
-            println("Pes Model infeasible.")
-            return
-        end
-
-        return objective_value(pmodel),px,py
-    end
-
-    return objective_value(model),x,y
 end
 
 function experimentR(
@@ -132,7 +101,7 @@ function cost_RG1(
     pes_bound = pes_value(inst_interval)
     
     gammas = 0:inst.T
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 5)
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
     plots = []
 
     for (i,rbound) in enumerate(rbounds)
@@ -143,7 +112,8 @@ function cost_RG1(
 
         case_experiment(inst1, gammas,
             with_gamma1,
-            LM.Model.create_R_model
+            LM.Model.create_R_model;
+            optimize=RModel.optimizeRmodel!,
         ) do i,model,_,_
             results[i] = objective_value(model)
         end
@@ -166,6 +136,50 @@ function cost_RG1(
     end
 end
 
+function cost_RG2(
+    inst::LotSizingInstance,
+    ;
+    name=nothing,
+)
+    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
+    pes_bound = pes_value(inst_interval)
+    
+    gammas = 0:max_gamma2_budget(inst)
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    plots = []
+
+    for (i,rbound) in enumerate(rbounds)
+        println("R* bound $(i)")
+        inst1 = @set inst.rbound=rbound
+
+        results = zeros(length(gammas))
+
+        case_experiment(inst1, gammas,
+            with_gamma2,
+            LM.Model.create_R_model;
+            optimize=RModel.optimizeRmodel!
+        ) do i,model,_,_
+            results[i] = objective_value(model)
+        end
+
+        cost_plot = make_cost_plot(gammas, results;
+            title="R* cost \$\\Gamma_2\$ (b=$(@sprintf "%.2e" rbound))",
+            ylabel="cost",
+            xlabel="\$\\Gamma\$",
+        )
+
+        push!(plots, cost_plot)
+    end
+
+    allplots = plt.plot(plots...; layout=length(rbounds), size=(2000,1000))
+
+    if isnothing(name)
+        println("Can't show multiple plots interactively.")
+    else
+        plt.savefig(allplots, "fig/$(name)_RG2_cost.png")
+    end
+end #cost_RG2
+
 function sample_RG1(
     inst::LotSizingInstance,
     ;
@@ -176,8 +190,8 @@ function sample_RG1(
     pes_bound = pes_value(inst_interval)
 
     gammas = 0:inst.T
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 5)
-    samples = sample_arrivals(inst, N)
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     plots=[]
 
@@ -190,7 +204,8 @@ function sample_RG1(
 
         case_experiment(inst1, gammas,
             with_gamma1,
-            LM.Model.create_R_model
+            LM.Model.create_R_model;
+            optimize=RModel.optimizeRmodel!
         ) do i,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
@@ -217,7 +232,61 @@ function sample_RG1(
     else
         plt.savefig(allplots, "fig/$(name)_RG1_sample.png")
     end
-end
+end #sample_RG1
+
+function sample_RG2(
+    inst::LotSizingInstance,
+    ;
+    N=100,
+    name=nothing,
+)
+    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
+    pes_bound = pes_value(inst_interval)
+
+    gammas = 0:max_gamma2_budget(inst)
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+
+    plots=[]
+
+    for (i,rbound) in enumerate(rbounds)
+        println("R* bound $(i)")
+        inst1 = @set inst.rbound=rbound
+
+        pes_min = zeros(length(gammas))
+        pes_max = zeros(length(gammas))
+
+        case_experiment(inst1, gammas,
+            with_gamma2,
+            LM.Model.create_R_model;
+            optimize=RModel.optimizeRmodel!
+        ) do i,_,xs,ys
+            costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+            pes_min[i] = minimum(costs)
+            pes_max[i] = maximum(costs)
+        end
+
+        cost_plot = plt.Plot()
+        plt.plot!(cost_plot, gammas, pes_min;
+            markershape=:circle, label="min")
+        plt.plot!(cost_plot, gammas, pes_max;
+            markershape=:circle,label="max")
+        plt.title!(cost_plot, "R* sampled cost \$\\Gamma_2\$ (b=$(@sprintf "%.2e" rbound))")
+        plt.ylabel!(cost_plot, "cost")
+        plt.xlabel!(cost_plot, "\$\\Gamma\$")
+
+        push!(plots, cost_plot)
+    end
+
+    allplots = plt.plot(plots...; layout=length(rbounds), size=(2000,1000))
+
+    if isnothing(name)
+        println("Can't show multiple plots interactively.")
+    else
+        plt.savefig(allplots, "fig/$(name)_RG2_sample.png")
+    end
+end #sample_RG2
 
 function hist_RG1(
     inst::LotSizingInstance,
@@ -229,8 +298,12 @@ function hist_RG1(
     pes_bound = pes_value(inst_interval)
 
     gammas = 0:inst.T
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 5)
-    samples = sample_arrivals(inst, N)
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, 6)]
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+
+    maxval = 0
+    all_plots = []
 
     for (i,rbound) in enumerate(rbounds)
         println("R* bound $(i)")
@@ -239,7 +312,8 @@ function hist_RG1(
         all_costs = []
         case_experiment(inst1, gammas,
             with_gamma1,
-            LM.Model.create_R_model
+            LM.Model.create_R_model;
+            optimize=RModel.optimizeRmodel!
         ) do _,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
@@ -257,13 +331,31 @@ function hist_RG1(
             gammas,
             all_costs;
             mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
+            rescale=true
         )
+
+        maxval = max(maxval, maximum(plt.ylims(plot)[end] for plot in plots))
 
         for plot in plots
             plt.vline!(plot, [rbounds[i]], legend=false)
         end
 
-        allhist = plt.plot(plots...; layout=length(gammas), size=(2000,1000))
+        push!(all_plots, plots)
+    end
+
+    for (i,rs) in enumerate(rstring)
+        for plot in all_plots[i]
+            plt.ylims!(plot, (0.0, maxval))
+        end
+        
+        layout=@plt.layout [a{0.01h}; plt.grid(4,3)]
+
+        allhist = plt.plot(
+            ExperimentUtils.layout_title("R* \$\\Gamma_1\$ b=$(rs)pes"),
+            all_plots[i]...;
+            layout=layout, 
+            size=(2000,1000)
+        )
 
         if isnothing(name)
             println("Can't show multiple plots interactively.")
@@ -272,6 +364,51 @@ function hist_RG1(
         end
     end
 end
+
+function budget_exceeding_RG1(
+    inst::LotSizingInstance,
+    ;
+    N=100,
+    name=nothing,
+)
+    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
+    pes_bound = pes_value(inst_interval)
+
+    gammas = 0:inst.T
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, length(rbounds))]
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+
+    plot = plt.Plot()
+    for (i,rbound) in rbounds
+        println("R* bound $(i)")
+        inst1 = with_rbound(inst, rbound)
+        exceeding = zeros(Int, length(gammas))
+
+        case_experiment(inst1, gammas,
+            with_gamma1,
+            LM.Model.create_R_model;
+            optimize=RModel.optimizeRmodel!
+        ) do j,_,xs,ys
+            costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+            exceeding[j] = count(c -> c > rbound, costs)
+        end
+
+        plt.plot!(plot, gammas, exceeding;
+            label="$(rstring[i])pes"
+        )
+    end
+end #budget_exceeding_RG1
+
+function combined_hist_RG1(
+    inst::LotSizingInstance,
+    ;
+    N=100,
+    name=nothing,
+)
+    #TODO:
+end #combined_hist_RG1
 
 function experiments(name,path)
     println("# Experiment \"$(name)\"")
@@ -284,6 +421,12 @@ function experiments(name,path)
 
     println("### Sample Gamma1")
         sample_RG1(inst; name=name, N=N)
+    
+    println("### Cost Gamma2")
+        cost_RG2(inst; name=name)
+
+    println("### Sample Gamma2")
+        sample_RG2(inst; name=name, N=N)
 
     println("### Histogram Gamma1")
         hist_RG1(inst; name=name, N=N)
@@ -293,4 +436,5 @@ function run()
     mkpath("fig")
 
     experiments("10_21_1", "data/gen/10_21_1.dat")
+    # experiments("10_41_1", "data/gen/10_41_1.dat")
 end #run

@@ -57,4 +57,31 @@ function create_R_model(
     return model,x,y,rho,z,pgraph,far_future_backordering
 end
 
+"""
+Optimize R model, and if not feasible solve the pessimistic model.
+
+Arguments:
+* inst - LotSizingInstance
+* model - JuMP model
+* x - vector of x variables
+* y - vector of y variables
+"""
+function optimizeRmodel!(inst, model, x, y)
+    optimize!(model)
+
+    if is_solved_and_feasible(model)
+        return model,x,y
+    end
+
+    pmodel,px,py = PesModel.create_pes_model(inst)
+
+    optimize!(pmodel)
+
+    if !is_solved_and_feasible(pmodel)
+        throw("Pessimistic model for R* is infeasible")
+    end
+
+    return pmodel, px, py
+end
+
 end #RModel
