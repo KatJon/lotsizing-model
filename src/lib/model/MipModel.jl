@@ -36,9 +36,6 @@ function opt_constraints(
 )
     tprod,tfut = time_periods(inst)
 
-    # production can happen only after setup
-    @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
-
     # lead time modelling
     LEAD = inst.common_lead_time
     earliest_arr(p) = p + LEAD - inst.early_deviation[p]
@@ -130,12 +127,36 @@ function opt_model(inst::LotSizingInstance)
 
     B,I,rho,fl = opt_variables(inst, model)
 
+    # production can happen only after setup
+    @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
+
     opt_constraints(inst, model, x, y, B, I, rho, fl)
 
     @objective(model, Min, opt_objective(inst, x, y, B, I))
 
     return model,x,y
 end #opt_model
+
+function opt_scenario_cost(
+    inst::LotSizingInstance,
+    xs::AbstractVector{Float64},
+    ;
+    make_optimizer = Utils.create_gurobi,
+    time_limit = 5*60,
+)
+    model = JuMP.Model(make_optimizer)
+    set_attribute(model, "TimeLimit", time_limit)
+
+    ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
+
+    B,I,rho,fl = opt_variables(inst, model)
+
+    opt_constraints(inst, model, xs, ys, B, I, rho, fl)
+
+    @objective(model, Min, opt_objective(inst, xs, ys, B, I))
+
+    return model
+end
 
 function prod_lead_cost_var(inst, model, x, y, zi, zb, arrival)
     (;T) = inst
@@ -200,10 +221,72 @@ function pes_model(inst::LotSizingInstance)
     return model,x,y
 end
 
+function pes_scenario_cost(
+    inst::LotSizingInstance,
+    xs::AbstractVector{Float64},
+    ;
+    make_optimizer = Utils.create_gurobi,
+    time_limit = 5*60,
+)
+    model = JuMP.Model(make_optimizer)
+    set_attribute(model, "TimeLimit", time_limit)
+
+    ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
+
+    tprod,tfut = time_periods(inst)
+
+    scenarios = Instance.list_scenarios(inst)
+    NS = length(scenarios)
+
+    zmax,z,zi,zb = pes_variables(inst, model, NS)
+
+    for (i,scen) in enumerate(scenarios)
+        @constraint(model,
+            prod_lead_cost_var(inst, model,
+                xs, ys, zi[i,:], zb[i,:], scen) <= z[i])
+        @constraint(model, z[i] <= zmax)
+    end
+
+    @objective(model, Min, zmax)
+
+    return model
+end
+
 function R_model(inst::LotSizingInstance)
+    if isnothing(inst.rbound)
+        throw("Instance doesn't provide R* bound")
+    end
+    
     model = JuMP.Model(create_gurobi)
 
     tprod,tfut = time_periods(inst)
+
+    x,y = create_common_variables(inst, model)
+
+    B,I,rho,fl = opt_variables(inst, model)
+
+    # production can happen only after setup
+    @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
+
+    opt_constraints(inst, model, x, y, B, I, rho, fl)
+
+    scenarios = Instance.list_scenarios(inst)
+    NS = length(scenarios)
+
+    zmax,z,zi,zb = pes_variables(inst, model, NS)
+
+    for (i,scen) in enumerate(scenarios)
+        @constraint(model,
+            prod_lead_cost_var(inst, model,
+                x, y, zi[i,:], zb[i,:], scen) <= z[i])
+        @constraint(model, z[i] <= zmax)
+    end
+
+    @constraint(model, zmax <= inst.rbound)
+
+    @objective(model, Min, opt_objective(inst, x, y, B, I))
+
+    return model,x,y
 
     return model,x,y
 end

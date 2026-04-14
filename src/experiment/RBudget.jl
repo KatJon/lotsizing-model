@@ -379,8 +379,8 @@ function budget_exceeding_RG1(
     rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, length(rbounds))]
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
-    plot = plt.Plot()
-    for (i,rbound) in rbounds
+    excplot = plt.Plot()
+    for (i,rbound) in enumerate(rbounds)
         println("R* bound $(i)")
         inst1 = with_rbound(inst, rbound)
         exceeding = zeros(Int, length(gammas))
@@ -388,16 +388,38 @@ function budget_exceeding_RG1(
         case_experiment(inst1, gammas,
             with_gamma1,
             LM.Model.create_R_model;
-            optimize=RModel.optimizeRmodel!
+            optimize=RModel.optimizeRmodel!,
         ) do j,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
             exceeding[j] = count(c -> c > rbound, costs)
         end
 
-        plt.plot!(plot, gammas, exceeding;
+        probability = [c / N for c in exceeding]
+
+        plt.plot!(excplot, gammas, probability;
             label="$(rstring[i])pes"
         )
+    end
+
+    exceeding = zeros(Int, length(gammas))
+    case_experiment(inst, gammas,
+        with_gamma1,
+        LM.Model.create_pes_model
+    ) do j,_,xs,ys
+        costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+        exceeding[j] = count(c -> c > pes_bound, costs)
+    end
+    probability = [c / N for c in exceeding]
+
+    plt.plot!(excplot, gammas, probability;
+        label="minmax", linestyle=:dash)
+
+    if isnothing(name)
+        plt.gui(excplot)
+    else
+        plt.savefig(excplot, "fig/$(name)_RG1_exceeding.png")
     end
 end #budget_exceeding_RG1
 
@@ -418,6 +440,9 @@ function experiments(name,path)
 
     println("### Cost Gamma1")
         cost_RG1(inst; name=name)
+
+    println("### Budget exceeding Gamma1")
+        budget_exceeding_RG1(inst; name=name, N=N)
 
     println("### Sample Gamma1")
         sample_RG1(inst; name=name, N=N)

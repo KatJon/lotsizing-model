@@ -1,9 +1,14 @@
 import LotsizingModel as LM
 
+import .LM.Instance
 import .LM.Model
 import .LM.MipModel
+import .LM.PesModel
+import .LM.OptModel
 
-using JuMP: optimize!, objective_value
+using .LM.ExperimentUtils
+
+using JuMP: JuMP, optimize!, objective_value
 using Accessors: @set,@reset
 
 function compare_models(mnet, mmip)
@@ -20,33 +25,103 @@ function compare_models(mnet, mmip)
     end
 end
 
-function run()
-    inst = LM.load_instance("data/simpl.dat")
-    
-    println("Optimistic")
-    moptnet, = Model.create_opt_model(inst)
-    moptmip, = MipModel.opt_model(inst)
+function eval_solution(
+    inst,
+    model, xs,
+    neteval,
+    mipeval,
+)
+    objval = objective_value(model)
+    println("Model cost: $(objval)")
+
+    netscen = neteval(inst, xs)
+    optimize!(netscen)
+    vnet = objective_value(netscen)
+
+    if !isapprox(objval, vnet)
+        println("!!! Model and net differ: $(vnet)")
+    else
+        println("Model and net align")
+    end
+
+    mipscen = mipeval(inst, xs)
+    optimize!(mipscen)
+    vmip = objective_value(mipscen)
+
+    if !isapprox(objval, vmip)
+        println("!!! Model and mip differ: $(vmip)")
+    else
+        println("Model and mip align")
+    end
+end
+
+function compare_scenarios(
+    inst::Instance.LotSizingInstance,
+    mnet,xnet,
+    mmip,xmip,
+    neteval,
+    mipeval
+)
+    println("## Network solution:")
+    eval_solution(
+        inst,
+        mnet, xnet,
+        neteval,
+        mipeval,
+    )
+
+    println("## MIP solution:")
+    eval_solution(
+        inst,
+        mmip, xmip,
+        neteval,
+        mipeval,
+    )
+end
+
+function run(path="data/simpl.dat")
+    inst = LM.load_instance(path)
+    inst = with_gamma1(inst, 2)
+
+    println("# Optimistic")
+    moptnet,xoptnet,yoptnet = Model.create_opt_model(inst)
+    moptmip,xoptmip,yoptmip = MipModel.opt_model(inst)
 
     compare_models(moptnet, moptmip)
 
+    compare_scenarios(inst,
+        moptnet, collect(JuMP.value.(xoptnet)),
+        moptmip, collect(JuMP.value.(xoptmip)),
+        OptModel.opt_scenario_cost,
+        MipModel.opt_scenario_cost,
+    )
+
     #=================#
 
-    println("Pessimistic")
-    mpesnet, = Model.create_pes_model(inst)
-    mpesmip, = MipModel.pes_model(inst)
+    println("# Pessimistic")
+    mpesnet,xpesnet = Model.create_pes_model(inst)
+    mpesmip,xpesmip = MipModel.pes_model(inst)
 
     compare_models(mpesnet, mpesmip)
-    
+    compare_scenarios(inst,
+        mpesnet, collect(JuMP.value.(xpesnet)),
+        mpesmip, collect(JuMP.value.(xpesmip)),
+        PesModel.pes_scenario_cost,
+        MipModel.pes_scenario_cost,
+    )
     #=================#
 
-    println("R* model")
+    println("# R* model")
     pesval = objective_value(mpesnet)
-    inst1 = @set inst.rbound=1.2*pesval
-    mrnet, = Model.create_R_model(inst)
-    mrmip, = nothing, #TODO:
+    inst1 = with_rbound(inst,1.2*pesval)
+    mrnet,xrnet = Model.create_R_model(inst1)
+    mrmip,xrmip = MipModel.R_model(inst1)
 
-    optimize!(mrnet)
-
-    # TODO: uncomment
-    # compare_models(mrnet, mrmip)
+    compare_models(mrnet, mrmip)
+    compare_scenarios(inst,
+        mrnet, collect(JuMP.value.(xrnet)),
+        mrmip, collect(JuMP.value.(xrmip)),
+        OptModel.opt_scenario_cost,
+        MipModel.opt_scenario_cost,
+    )
 end

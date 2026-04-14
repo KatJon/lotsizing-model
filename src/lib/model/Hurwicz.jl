@@ -46,7 +46,7 @@ function create_hurwicz_model(
 
     PesModel.pes_constraints(inst, model, pgraph, z, x)
 
-    OptModel.opt_constraints(inst, model, ograph, M, rho, flow, x)
+    OptModel.opt_constraints(inst, model, ograph, rho, flow, x)
 
     @constraint(model, [t=prod_periods(inst)],
         x[t] <= M * y[t])
