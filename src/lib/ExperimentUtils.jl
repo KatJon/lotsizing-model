@@ -8,11 +8,14 @@ using ..Instance
 
 import Plots as plt
 import JuMP
+import Statistics
+import StatsBase
 
 using Plots.PlotMeasures
 using Accessors: @set,@reset
 using ProgressMeter: @showprogress
 using Random
+using Printf
 
 export with_interval,
     with_gamma1, with_gamma2,
@@ -223,5 +226,43 @@ function layout_title(title)
         margin=0mm
     )
 end #layout_title
+
+gathered_stats = ["min","max","mean","median","stddev","perc90"]
+
+function experiment_stats(samples)
+    N = length(samples)
+
+    min = minimum(samples)
+    max = maximum(samples)
+    mean = Statistics.mean(samples)
+    median = Statistics.median(samples)
+    stddev = Statistics.std(samples)
+    perc90 = StatsBase.percentile(samples, 90)
+
+    return min,max,mean,median,stddev,perc90
+end
+
+sprint_2f = x -> @sprintf "%.2f" x
+
+function save_stats(path, stats; index_name="index")
+    open(path, "w") do file
+        write(file, "$(index_name), min, max, mean, median, stddev, perc90\n")
+
+        for row in stats
+            i,min,max,mean,median,stddev,perc90 = row
+
+            line = join([
+                "$(i)",
+                "$(sprint_2f(min))",
+                "$(sprint_2f(max))",
+                "$(sprint_2f(mean))",
+                "$(sprint_2f(median))",
+                "$(sprint_2f(stddev))",
+                "$(sprint_2f(perc90))",
+            ], ", ")
+            write(file, "$(line)\n")
+        end
+    end
+end #save_stats
 
 end #ExperimentUtils

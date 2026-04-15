@@ -11,26 +11,46 @@ using ..CommonModel
 using ..OptModel
 using ..PesModel
 
+using Accessors: @set
 using JuMP, Gurobi
 
+"""
+Create R* model for the instance.
+
+Arguments:
+* inst - LotSizingInstance
+
+Optional arguments:
+* make_optimizer - (default: create_gurobi) optimizer factory
+* time_limit - (default: 5*60 s) time limit in seconds
+* override_R_uncertainty - override uncertainty for the R* bound 
+"""
 function create_R_model(
     inst::LotSizingInstance;
     make_optimizer = Utils.create_gurobi,
-    time_limit = 5*60
+    time_limit = 5*60,
+    override_R_uncertainty = nothing
 )
     if isnothing(inst.rbound)
         throw("Instance doesn't provide R* bound")
     end
+
     model = JuMP.Model(make_optimizer)
     set_attribute(model, "TimeLimit", time_limit)
     
+    if isnothing(override_R_uncertainty)
+        pinst = inst
+    else
+        pinst = @set inst.uncertainty=override_R_uncertainty
+    end
+
     ograph = OptG.create_opt_graph(inst)
-    pgraph = PesG.create_pes_graph(inst)
+    pgraph = PesG.create_pes_graph(pinst)
 
     ## Variables
     x,y = create_common_variables(inst, model)
     rho,flow = OptModel.create_opt_variables(inst, model, ograph)
-    z = PesModel.create_pes_variables(inst, model, pgraph)
+    z = PesModel.create_pes_variables(pinst, model, pgraph)
 
     ## Objective
     @objective(model, Min,
@@ -40,10 +60,10 @@ function create_R_model(
     # (54)
     B = inst.rbound
     @constraint(model,
-        PesModel.pes_objective(inst, pgraph, z, x, y) <= B)
+        PesModel.pes_objective(pinst, pgraph, z, x, y) <= B)
 
     # (35)-(37)
-    PesModel.pes_constraints(inst, model, pgraph, z, x)
+    PesModel.pes_constraints(pinst, model, pgraph, z, x)
 
     # (43)-(48)
     OptModel.opt_constraints(inst, model, ograph, rho, flow, x)

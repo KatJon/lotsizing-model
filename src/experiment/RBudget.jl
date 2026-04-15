@@ -141,7 +141,7 @@ function cost_RG2(
     ;
     name=nothing,
 )
-    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
+    inst_interval = ExperimentUtils.with_interval(inst)
     pes_bound = pes_value(inst_interval)
     
     gammas = 0:max_gamma2_budget(inst)
@@ -186,7 +186,7 @@ function sample_RG1(
     N=100,
     name=nothing,
 )
-    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
+    inst_interval = ExperimentUtils.with_interval(inst)
     pes_bound = pes_value(inst_interval)
 
     gammas = 0:inst.T
@@ -201,16 +201,27 @@ function sample_RG1(
 
         pes_min = zeros(length(gammas))
         pes_max = zeros(length(gammas))
+        
+        stats = []
 
         case_experiment(inst1, gammas,
             with_gamma1,
             LM.Model.create_R_model;
             optimize=RModel.optimizeRmodel!
-        ) do i,_,xs,ys
+        ) do j,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
-            pes_min[i] = minimum(costs)
-            pes_max[i] = maximum(costs)
+            push!(stats, [gammas[j], ExperimentUtils.experiment_stats(costs)...])
+
+            pes_min[j] = minimum(costs)
+            pes_max[j] = maximum(costs)
+        end
+
+        if !isnothing(name)
+            ExperimentUtils.save_stats(
+                "fig/$(name)_RG1_sample_stats_$(i).csv",
+                stats,
+            )
         end
 
         cost_plot = plt.Plot()
@@ -234,6 +245,78 @@ function sample_RG1(
     end
 end #sample_RG1
 
+function sample_override_RG1(
+    inst::LotSizingInstance,
+    ;
+    N=100,
+    name=nothing,
+)
+    inst_interval = ExperimentUtils.with_interval(inst)
+    pes_bound = pes_value(inst_interval)
+
+    gammas = 0:inst.T
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+    plots=[]
+
+    for (i,rbound) in enumerate(rbounds)
+        inst1 = ExperimentUtils.with_rbound(inst_interval,rbound)
+        println("R* bound $(i)")
+        pes_min = zeros(length(gammas))
+        pes_max = zeros(length(gammas))
+
+        stats = []
+        
+        @showprogress for (j,gamma) in enumerate(gammas)
+            model,x,y = RModel.create_R_model(inst1;
+                override_R_uncertainty=Uncertainty.Model(Uncertainty.Gamma1, gamma))
+            
+            model,x,y = RModel.optimizeRmodel!(inst,model,x,y)
+
+            if !JuMP.is_solved_and_feasible(model)
+                error("Model ($(i),$(case_param)) cannot be solved, reason=$(JuMP.termination_status(model))")
+                continue
+            end
+
+            xs = collect(JuMP.value.(x))
+            ys = collect(JuMP.value.(y))
+
+            costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+            push!(stats, [gammas[j], ExperimentUtils.experiment_stats(costs)...])
+
+            pes_min[j] = minimum(costs)
+            pes_max[j] = maximum(costs)
+        end
+
+        if !isnothing(name)
+            ExperimentUtils.save_stats(
+                "fig/$(name)_RG1_sample_override_stats_$(i).csv",
+                stats,
+            )
+        end
+
+        cost_plot = plt.Plot()
+        plt.plot!(cost_plot, gammas, pes_min;
+            markershape=:circle, label="min")
+        plt.plot!(cost_plot, gammas, pes_max;
+            markershape=:circle,label="max")
+        plt.title!(cost_plot, "R* sampled cost \$\\Gamma_1\$ (b=$(@sprintf "%.2e" rbound))")
+        plt.ylabel!(cost_plot, "cost")
+        plt.xlabel!(cost_plot, "\$\\Gamma\$")
+
+        push!(plots, cost_plot)
+    end
+
+    allplots = plt.plot(plots...; layout=length(rbounds), size=(2000,1000))
+
+    if isnothing(name)
+        println("Can't show multiple plots interactively.")
+    else
+        plt.savefig(allplots, "fig/$(name)_RG1_sample_override.png")
+    end
+end #sample_override_RG1
+
 function sample_RG2(
     inst::LotSizingInstance,
     ;
@@ -256,15 +339,26 @@ function sample_RG2(
         pes_min = zeros(length(gammas))
         pes_max = zeros(length(gammas))
 
+        stats = []
+
         case_experiment(inst1, gammas,
             with_gamma2,
             LM.Model.create_R_model;
             optimize=RModel.optimizeRmodel!
-        ) do i,_,xs,ys
+        ) do j,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
-            pes_min[i] = minimum(costs)
-            pes_max[i] = maximum(costs)
+            push!(stats, [gammas[j], ExperimentUtils.experiment_stats(costs)...])
+
+            pes_min[j] = minimum(costs)
+            pes_max[j] = maximum(costs)
+        end
+
+        if !isnothing(name)
+            ExperimentUtils.save_stats(
+                "fig/$(name)_RG1_sample_stats_$(i).csv",
+                stats,
+            )
         end
 
         cost_plot = plt.Plot()
@@ -438,17 +532,20 @@ function experiments(name,path)
 
     N = 10000
 
-    println("### Cost Gamma1")
-        cost_RG1(inst; name=name)
+    # println("### Cost Gamma1")
+    #     cost_RG1(inst; name=name)
 
-    println("### Budget exceeding Gamma1")
-        budget_exceeding_RG1(inst; name=name, N=N)
+    # println("### Budget exceeding Gamma1")
+    #     budget_exceeding_RG1(inst; name=name, N=N)
 
-    println("### Sample Gamma1")
-        sample_RG1(inst; name=name, N=N)
-    
-    println("### Cost Gamma2")
-        cost_RG2(inst; name=name)
+    # println("### Sample Gamma1")
+    #     sample_RG1(inst; name=name, N=N)
+
+    # println("### Sample override Gamma1")
+    #     sample_override_RG1(inst; name=name, N=N)
+
+    # println("### Cost Gamma2")
+    #     cost_RG2(inst; name=name)
 
     println("### Sample Gamma2")
         sample_RG2(inst; name=name, N=N)

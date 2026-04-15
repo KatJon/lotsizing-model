@@ -115,12 +115,15 @@ function sample_pesG1(inst::LotSizingInstance; N=1000, name=nothing)
     maxbound = zeros(length(gammas))
 
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+    stats = []
 
     case_experiment(inst, gammas,
         with_gamma1,
         LM.Model.create_pes_model
     ) do i,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+        
+        push!(stats, [gammas[i], ExperimentUtils.experiment_stats(costs)...])
 
         pes_min[i] = minimum(costs)
         pes_max[i] = maximum(costs)
@@ -147,6 +150,7 @@ function sample_pesG1(inst::LotSizingInstance; N=1000, name=nothing)
         plt.gui(cost_plot)
     else
         plt.savefig(cost_plot,"fig/$(name)_pesG1_sample.png")
+        ExperimentUtils.save_stats("fig/$(name)_pesG1_sample_stats.csv", stats)
     end
 end
 
@@ -159,12 +163,15 @@ function sample_pesG2(inst::LotSizingInstance;N=1000,name=nothing)
     maxbound = zeros(length(gammas))
 
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+    stats = []
 
     case_experiment(inst, gammas,
         with_gamma2,
         LM.Model.create_pes_model,
     ) do i,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+        
+        push!(stats, [gammas[i], ExperimentUtils.experiment_stats(costs)...])
 
         pes_min[i] = minimum(costs)
         pes_max[i] = maximum(costs)
@@ -188,6 +195,7 @@ function sample_pesG2(inst::LotSizingInstance;N=1000,name=nothing)
         plt.gui(cost_plot)
     else
         plt.savefig("fig/$(name)_pesG2_sample.png")
+        ExperimentUtils.save_stats("fig/$(name)_pesG2_sample_stats.csv", stats)
     end
 end
 
@@ -200,12 +208,15 @@ function sample_optG1(inst::LotSizingInstance; N=1000, name=nothing)
     maxbound = zeros(length(gammas))
 
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+    stats = []
 
     case_experiment(inst, gammas,
         with_gamma1,
         LM.Model.create_opt_model
     ) do i,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+        push!(stats, [gammas[i], ExperimentUtils.experiment_stats(costs)...])
 
         pes_min[i] = minimum(costs)
         pes_max[i] = maximum(costs)
@@ -232,6 +243,7 @@ function sample_optG1(inst::LotSizingInstance; N=1000, name=nothing)
         plt.gui(cost_plot)
     else
         plt.savefig(cost_plot,"fig/$(name)_optG1_sample.png")
+        ExperimentUtils.save_stats("fig/$(name)_optG1_sample_stats.csv", stats)
     end
 end
 
@@ -244,12 +256,15 @@ function sample_optG2(inst::LotSizingInstance; N=1000, name=nothing)
     maxbound = zeros(length(gammas))
 
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+    stats = []
 
     case_experiment(inst, gammas,
         with_gamma2,
         LM.Model.create_opt_model
     ) do i,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+        push!(stats, [gammas[i], ExperimentUtils.experiment_stats(costs)...])
 
         pes_min[i] = minimum(costs)
         pes_max[i] = maximum(costs)
@@ -275,6 +290,7 @@ function sample_optG2(inst::LotSizingInstance; N=1000, name=nothing)
         plt.gui(cost_plot)
     else
         plt.savefig(cost_plot,"fig/$(name)_optG2_sample.png")
+        ExperimentUtils.save_stats("fig/$(name)_optG2_sample_stats.csv", stats)
     end
 end
 
@@ -405,5 +421,5 @@ end #experiments
 function run()
     mkpath("fig")
     experiments("10_21_1", "data/gen/10_21_1.dat")
-    experiments("10_41_1", "data/gen/10_41_1.dat")
+    # experiments("10_41_1", "data/gen/10_41_1.dat")
 end #run
