@@ -387,39 +387,38 @@ function experiments(name, path)
     N = 10000
 
     # MinMax
-    println("## Min-max experiments")
-    println("### Cost Gamma1")
-        cost_pesG1(inst;name=name)
-    println("### Cost Gamma2")
-        cost_pesG2(inst;name=name)
+    # println("## Min-max experiments")
+    # println("### Cost Gamma1")
+    #     cost_pesG1(inst;name=name)
+    # println("### Cost Gamma2")
+    #     cost_pesG2(inst;name=name)
     
     println("### Sample Gamma1")
         sample_pesG1(inst;name=name,N=N)
     println("### Sample Gamma2")
         sample_pesG2(inst;name=name,N=N)
 
-    println("### Histogram Gamma1")
-        hist_pesG1(inst;name=name,N=N)
+    # println("### Histogram Gamma1")
+    #     hist_pesG1(inst;name=name,N=N)
     
-    println("## Min-min experiments")
-    println("### Cost Gamma1")
-        cost_optG1(inst;name=name)
-    println("### Cost Gamma2")
-        cost_optG2(inst;name=name)
+    # println("## Min-min experiments")
+    # println("### Cost Gamma1")
+    #     cost_optG1(inst;name=name)
+    # println("### Cost Gamma2")
+    #     cost_optG2(inst;name=name)
 
     println("### Sample Gamma1")
         sample_optG1(inst;name=name,N=N)
     println("### Sample Gamma2")
         sample_optG2(inst;name=name,N=N)
 
-
-    println("### Histogram Gamma1")
-        hist_optG1(inst;name=name,N=N)
+    # println("### Histogram Gamma1")
+    #     hist_optG1(inst;name=name,N=N)
 
 end #experiments
 
 function run()
     mkpath("fig")
-    experiments("10_21_1", "data/gen/10_21_1.dat")
-    # experiments("10_41_1", "data/gen/10_41_1.dat")
+    # experiments("10_21_1", "data/gen/10_21_1.dat")
+    experiments("10_41_1", "data/gen/10_41_1.dat")
 end #run

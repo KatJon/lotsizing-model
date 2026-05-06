@@ -180,7 +180,7 @@ function make_cost_plot(
     return cost_plot
 end #make_cost_plot
 
-function get_cost_bounds(inst::LotSizingInstance, xs)
+function get_cost_bounds(inst::LotSizingInstance, xs::Vector{Float64})
     mmin = OptModel.opt_scenario_cost(inst,xs)
     JuMP.optimize!(mmin)
 
