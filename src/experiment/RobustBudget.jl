@@ -189,7 +189,10 @@ function sample_pesG2(inst::LotSizingInstance;N=1000,name=nothing)
         markershape=:circle,label="min sample")
     plt.plot!(cost_plot, gammas, pes_max;
         markershape=:circle,label="max sample")
+    
     plt.title!(cost_plot, "Min-max sampled cost \$\\Gamma_2\$")
+    plt.ylabel!(cost_plot, "cost")
+    plt.xlabel!(cost_plot, "\$\\Gamma\$")
 
     if isnothing(name)
         plt.gui(cost_plot)

@@ -133,7 +133,7 @@ function plot_histograms(
         hist = Float64.(hist)
         hist ./= Float64(nsamples)
 
-        histplot = plt.bar(bins, hist, ylims=(0.0, 1.0))
+        histplot = plt.bar(bins, hist, ylims=(0.0, 1.0), legend=false)
         if !isnothing(mktitle)
             title = mktitle(param)
             plt.title!(histplot,title)
@@ -160,11 +160,13 @@ function make_cost_plot(
     title=nothing,
     ylabel="cost",
     xlabel=nothing,
+    bottom_margin=nothing,
 )
     cost_plot = plt.Plot()
     plt.plot!(cost_plot, cases, results;
         markershape=:circle,
         legend=false,
+        bottom_margin=bottom_margin,
     )
 
     if !isnothing(title)
@@ -223,9 +225,18 @@ function layout_title(title)
         framestyle=nothing,
         showaxis=false,
         xticks=false,yticks=false,
-        margin=0mm
+        margin=0mm,
     )
 end #layout_title
+
+function vertical_title(title)
+    return plt.plot(title=title,
+        framestyle=nothing,
+        showaxis=false,
+        xticks=false,yticks=false,
+        margin=0mm,
+    )
+end
 
 gathered_stats = ["min","max","mean","median","stddev","perc90"]
 
@@ -264,5 +275,25 @@ function save_stats(path, stats; index_name="index")
         end
     end
 end #save_stats
+
+
+
+function pareto_front(observations)
+    obs = sort(observations)
+    front = []
+
+    valx = -Inf
+    valy = Inf
+
+    for point in obs
+        if point[1] > valx && point[2] < valy
+            push!(front, point)
+            valx = point[1]
+            valy = point[2]
+        end
+    end
+    
+    return front
+end
 
 end #ExperimentUtils

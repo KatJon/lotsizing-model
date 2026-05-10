@@ -103,7 +103,9 @@ function cost_RG1(
     pes_bound = pes_value(inst_interval)
     
     gammas = 0:inst.T
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    NBOUNDS = 6
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
     plots = []
 
     for (i,rbound) in enumerate(rbounds)
@@ -121,12 +123,20 @@ function cost_RG1(
         end
 
         cost_plot = make_cost_plot(gammas, results;
-            title="R* cost \$\\Gamma_1\$ (b=$(@sprintf "%.2e" rbound))",
+            title="R* cost \$\\Gamma_1\$ (b=$(rstring[i])pes)",
             ylabel="cost",
             xlabel="\$\\Gamma\$",
+            bottom_margin=10mm,
         )
 
         push!(plots, cost_plot)
+    end
+
+    minval = minimum(plt.ylims(plot)[begin] for plot in plots)
+    maxval = maximum(plt.ylims(plot)[end] for plot in plots)
+
+    for plot in plots
+        plt.ylims!(plot, minval, maxval)
     end
 
     allplots = plt.plot(plots...; layout=length(rbounds), size=(2000,1000))
@@ -147,7 +157,9 @@ function cost_RG2(
     pes_bound = pes_value(inst_interval)
     
     gammas = 0:max_gamma2_budget(inst)
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    NBOUNDS = 6
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
     plots = []
 
     for (i,rbound) in enumerate(rbounds)
@@ -160,17 +172,25 @@ function cost_RG2(
             with_gamma2,
             LM.Model.create_R_model;
             optimize=RModel.optimizeRmodel!
-        ) do i,model,_,_
-            results[i] = objective_value(model)
+        ) do j,model,_,_
+            results[j] = objective_value(model)
         end
 
         cost_plot = make_cost_plot(gammas, results;
-            title="R* cost \$\\Gamma_2\$ (b=$(@sprintf "%.2e" rbound))",
+            title="R* cost \$\\Gamma_2\$ (b=$(rstring[i])pes",
             ylabel="cost",
             xlabel="\$\\Gamma\$",
+            bottom_margin=10mm,
         )
 
         push!(plots, cost_plot)
+    end
+
+    minval = minimum(plt.ylims(plot)[begin] for plot in plots)
+    maxval = maximum(plt.ylims(plot)[end] for plot in plots)
+
+    for plot in plots
+        plt.ylims!(plot, minval, maxval)
     end
 
     allplots = plt.plot(plots...; layout=length(rbounds), size=(2000,1000))
@@ -192,7 +212,10 @@ function sample_RG1(
     pes_bound = pes_value(inst_interval)
 
     gammas = 0:inst.T
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
+    NBOUNDS = 6
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
+
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     plots=[]
@@ -231,7 +254,7 @@ function sample_RG1(
             markershape=:circle, label="min")
         plt.plot!(cost_plot, gammas, pes_max;
             markershape=:circle,label="max")
-        plt.title!(cost_plot, "R* sampled cost \$\\Gamma_1\$ (b=$(@sprintf "%.2e" rbound))")
+        plt.title!(cost_plot, "R* sampled cost \$\\Gamma_1\$ (b=$(rstring[i])pes)")
         plt.ylabel!(cost_plot, "cost")
         plt.xlabel!(cost_plot, "\$\\Gamma\$")
 
@@ -396,8 +419,9 @@ function hist_RG1(
     pes_bound = pes_value(inst_interval)
 
     gammas = 0:inst.T
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 6)
-    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, 6)]
+    NBOUNDS=6
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     maxval = 0
@@ -609,13 +633,81 @@ function combined_hist_RG1(
     inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
     pes_bound = pes_value(inst_interval)
 
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, 5)
-    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, 6)]
+    NBOUNDS = 5
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
     all_plots = []
     maxval = 0
 
+    raw_optplots = []
+    all_costs = []
+    case_experiment(inst, gammas,
+        with_gamma1,
+        LM.Model.create_opt_model
+    ) do _,_,xs,ys
+        costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+        push!(all_costs, costs)
+    end
+
+    amin = minimum(minimum(costs) for costs in all_costs)
+    amax = maximum(maximum(costs) for costs in all_costs)
+
+    # Sturges rule
+    k = 1 + 2*ceil(Int64, log2(N))
+
+    plots = plot_histograms(
+        amin, amax, k, N,
+        gammas,
+        all_costs;
+        mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
+        rescale=true
+    )
+
+    plt.ylabel!(plots[begin], "Opt")
+    plt.plot!(plots[begin], left_margin = 25mm)
+
+    push!(all_plots, plots)
+    append!(raw_optplots, plots)
+
+    maxval = max(maxval, maximum(plt.ylims(plot)[end] for plot in plots))
+
+    raw_pesplots = []
+    all_costs = []
+    case_experiment(inst, gammas,
+        with_gamma1,
+        LM.Model.create_pes_model
+    ) do _,_,xs,ys
+        costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+        push!(all_costs, costs)
+    end
+
+    amin = minimum(minimum(costs) for costs in all_costs)
+    amax = maximum(maximum(costs) for costs in all_costs)
+
+    # Sturges rule
+    k = 1 + 2*ceil(Int64, log2(N))
+
+    plots = plot_histograms(
+        amin, amax, k, N,
+        gammas,
+        all_costs;
+        mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
+        rescale=true
+    )
+
+    plt.ylabel!(plots[begin], "Pes")
+    plt.plot!(plots[begin], left_margin = 25mm)
+
+    push!(all_plots, plots)
+    append!(raw_pesplots, plots)
+
+    maxval = max(maxval, maximum(plt.ylims(plot)[end] for plot in plots))
+
+    raw_Rplots = []
     for rbound in rbounds
         inst1 = with_rbound(inst, rbound)
 
@@ -650,22 +742,35 @@ function combined_hist_RG1(
             plt.vline!(plot, [rbound], legend=false)
         end
 
-        push!(all_plots, plots...)
+        push!(all_plots, plots)
+        push!(raw_Rplots, plots)
     end
 
     allhist = plt.Plot()
 
-    for plot in all_plots
-        plt.ylims!(plot, (0.0, maxval))
+    for row in all_plots
+        for plot in row
+            plt.ylims!(plot, (0.0, maxval))
+        end
     end
 
-    layout=@plt.layout [a{0.01h}; plt.grid(length(gammas),length(rbounds))]
+    for (i,row) in enumerate(raw_Rplots)
+        plt.ylabel!(row[begin], "R* C=$(rstring[i])pes")
+        plt.plot!(row[begin], left_margin = 25mm)
+    end
+    Rplots = reduce(vcat, raw_Rplots)
+
+    layout= @plt.layout [
+        plt.grid(2+length(rbounds), length(gammas))
+    ]
 
     allhist = plt.plot(
-        ExperimentUtils.layout_title("R* Gamma1 sensitivity"),
-        all_plots...;
+        raw_optplots...,
+        raw_pesplots...,
+        Rplots...;
         layout=layout, 
-        size=(3000,2000)
+        size=(3000,2000),
+        plot_title="R* \$\\Gamma_1\$ histogram"
     )
 
     if isnothing(name)
@@ -689,6 +794,7 @@ function pareto_front(
     rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
 
     plot = plt.Plot()
+    all_points = []
 
     points = []
     case_experiment(inst, gammas,
@@ -699,6 +805,7 @@ function pareto_front(
 
         push!(points, res)
     end
+    append!(all_points, points)
 
     xs,ys = collect.(zip(points...))
     plt.plot!(plot, xs, ys, seriestype=:scatter,
@@ -714,6 +821,7 @@ function pareto_front(
 
         push!(points, res)
     end
+    append!(all_points, points)
 
     xs,ys = collect.(zip(points...))
     plt.plot!(plot, xs, ys, seriestype=:scatter,
@@ -733,10 +841,20 @@ function pareto_front(
 
             push!(points, res)
         end
+        append!(all_points, points)
+
 
         xs,ys = collect.(zip(points...))
         plt.plot!(plot, xs, ys, seriestype=:scatter, label="R* b=$(rstring[i])")
+
     end
+    front = ExperimentUtils.pareto_front(all_points)
+    xs,ys = collect.(zip(front...))
+    plt.plot!(plot, xs, ys,
+        linestyle=:dash,
+        label="Pareto front",
+        z_order=:back,
+    )
 
     plt.ylabel!(plot, "Max cost")
     plt.xlabel!(plot, "Min cost")
@@ -771,7 +889,8 @@ function solution_evolution(inst; name=nothing)
             results[i,:] = collect(xs)
         end
 
-        plot = plt.areaplot(rbounds,results, 
+        plot = plt.areaplot(rbounds, results,
+            label=permutedims(["\$x_{$(i)}\$" for i in 1:inst.T]),
             palette=:Spectral_10,
             title="\$\\Gamma_1 = $(gamma)\$")
 
@@ -789,46 +908,66 @@ function solution_evolution(inst; name=nothing)
     end
 end
 
-function experiments(name,path)
+function experiments(name,path; skip_long=false)
     println("# Experiment \"$(name)\"")
     inst = LM.load_instance(path)
 
     N = 10000
 
-    println("### Histogram fix gamma G1")
-        hist_RG1_fixgamma(inst, name=name, N=N)
     
+    
+    if !skip_long
+    println("### Combined hist G1")
+        combined_hist_RG1(inst, name=name, N=N)
+    end
+
     return
 
-    println("### Solution evolution")
-        solution_evolution(inst, name=name)
+    println("### Cost Gamma1")
+        cost_RG1(inst; name=name)
+    println("### Cost Gamma2")
+        cost_RG2(inst; name=name)
 
     println("### Pareto front")
         pareto_front(inst, name=name)
 
-    println("### Combined hist G1")
-        combined_hist_RG1(inst, name=name, N=N)
+    println("### Solution evolution")
+        solution_evolution(inst, name=name)
 
-    println("### Cost Gamma1")
-        cost_RG1(inst; name=name)
+    
 
+    if !skip_long
+    println("### Histogram fix gamma G1")
+        hist_RG1_fixgamma(inst, name=name, N=N)
+    end
+
+    
+
+    if !skip_long
     println("### Budget exceeding Gamma1")
         budget_exceeding_RG1(inst; name=name, N=N)
+    end
 
+    if !skip_long
     println("### Sample Gamma1")
         sample_RG1(inst; name=name, N=N)
+    end
 
+    if !skip_long
     println("### Sample override Gamma1")
         sample_override_RG1(inst; name=name, N=N)
+    end
 
-    println("### Cost Gamma2")
-        cost_RG2(inst; name=name)
 
+    if !skip_long
     println("### Sample Gamma2")
         sample_RG2(inst; name=name, N=N)
+    end
 
+    if !skip_long
     println("### Histogram Gamma1")
         hist_RG1(inst; name=name, N=N)
+    end
 end
 
 function run()
@@ -836,5 +975,5 @@ function run()
 
     experiments("10_21_1", "data/gen/10_21_1.dat")
     # experiments("10_41_1", "data/gen/10_41_1.dat")
-    # experiments("10_41_2", "data/gen/10_41_2.dat")
+    # experiments("15_31_1", "data/gen/15_31_1.dat", skip_long=true)
 end #run

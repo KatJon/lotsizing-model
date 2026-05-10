@@ -7,7 +7,7 @@ cS_1 cS_2 ... cS_T
 ## production_cost: vector[double]
 cP_1 cP_2 ... cP_T
 ## production_capacity: vector[double]
-b_1 b_2 ... b_T
+C_1 C_2 ... C_T
 # lead time
 ## common_lead_time: int
 \hat{l}
