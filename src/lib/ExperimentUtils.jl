@@ -24,6 +24,7 @@ export case_experiment
 export plot_histograms
 export make_cost_plot
 export get_cost_bounds
+export stats_table_row
 
 "Create new instance from `inst` with unlimited budget"
 function with_interval(inst::LotSizingInstance)
@@ -121,6 +122,7 @@ function plot_histograms(
     ; 
     mktitle=nothing,
     rescale=false,
+    perc90=false,
 )
     plots=[]
 
@@ -147,6 +149,14 @@ function plot_histograms(
     if rescale
         for plot in plots
             plt.ylims!(plot, (0.0, maxbin))
+        end
+    end
+
+    if perc90
+        for (plot, row) in zip(plots, all_data)
+            perc90val = StatsBase.percentile(row, 90)
+
+            plt.vline!(plot, [perc90val], color=:black, legend=false)
         end
     end
 
@@ -250,10 +260,18 @@ function experiment_stats(samples)
     stddev = Statistics.std(samples)
     perc90 = StatsBase.percentile(samples, 90)
 
-    return min,max,mean,median,stddev,perc90
+    return (
+        min=min,
+        max=max,
+        mean=mean,
+        median=median,
+        stddev=stddev,
+        perc90=perc90,
+    )
 end
 
 sprint_2f = x -> @sprintf "%.2f" x
+sprint_4f = x -> @sprintf "%.4f" x
 
 function save_stats(path, stats; index_name="index")
     open(path, "w") do file
@@ -276,7 +294,17 @@ function save_stats(path, stats; index_name="index")
     end
 end #save_stats
 
+function stats_table_row(row, gamma; model=nothing, skipnl=false)
+    line = join([
+        isnothing(model) ? "" : model,
+        "$(gamma)",
+        (sprint_2f(val) for val in row)...
+    ], " & ")
 
+    nl = skipnl ? "" : " \\\\"
+
+    return "$(line)$(nl)"
+end
 
 function pareto_front(observations)
     obs = sort(observations)

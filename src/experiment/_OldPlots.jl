@@ -10,26 +10,12 @@ using .LM.ExperimentUtils
 import Plots as plt
 using Plots.PlotMeasures
 using Accessors: @set,@reset
-using ProgressMeter
-using JuMP
 using DelimitedFiles
+using JuMP
 using Printf
+using ProgressMeter
+using StatsBase
 
-function opt_value(inst::LotSizingInstance)
-    model, = LM.Model.create_opt_model(inst)
-
-    optimize!(model)
-
-    return objective_value(model)
-end
-
-function pes_value(inst::LotSizingInstance)
-    model, = LM.Model.create_pes_model(inst)
-
-    optimize!(model)
-
-    return objective_value(model)
-end
 
 function experimentR(
     inst::LotSizingInstance,
@@ -226,6 +212,7 @@ function sample_RG1(
 
         pes_min = zeros(length(gammas))
         pes_max = zeros(length(gammas))
+        p90 = zeros(length(gammas))
         
         stats = []
 
@@ -236,10 +223,12 @@ function sample_RG1(
         ) do j,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
-            push!(stats, [gammas[j], ExperimentUtils.experiment_stats(costs)...])
+            expstats = ExperimentUtils.experiment_stats(costs)
+            push!(stats, [gammas[j], expstats...])
 
             pes_min[j] = minimum(costs)
             pes_max[j] = maximum(costs)
+            p90[j] = expstats.perc90
         end
 
         if !isnothing(name)
@@ -254,6 +243,8 @@ function sample_RG1(
             markershape=:circle, label="min")
         plt.plot!(cost_plot, gammas, pes_max;
             markershape=:circle,label="max")
+        plt.plot!(cost_plot, gammas, p90;
+            label="90th perc.")
         plt.title!(cost_plot, "R* sampled cost \$\\Gamma_1\$ (b=$(rstring[i])pes)")
         plt.ylabel!(cost_plot, "cost")
         plt.xlabel!(cost_plot, "\$\\Gamma\$")
@@ -365,6 +356,7 @@ function sample_RG2(
 
         pes_min = zeros(length(gammas))
         pes_max = zeros(length(gammas))
+        p90 = zeros(length(gammas))
 
         stats = []
 
@@ -375,10 +367,12 @@ function sample_RG2(
         ) do j,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
-            push!(stats, [gammas[j], ExperimentUtils.experiment_stats(costs)...])
+            expstats = ExperimentUtils.experiment_stats(costs)
+            push!(stats, [gammas[j], expstats...])
 
             pes_min[j] = minimum(costs)
             pes_max[j] = maximum(costs)
+            p90[j] = expstats.perc90
         end
 
         if !isnothing(name)
@@ -393,6 +387,8 @@ function sample_RG2(
             markershape=:circle, label="min")
         plt.plot!(cost_plot, gammas, pes_max;
             markershape=:circle,label="max")
+        plt.plot!(cost_plot, gammas, p90;
+            label="90th percentile")
         plt.title!(cost_plot, "R* sampled cost \$\\Gamma_2\$ (b=$(@sprintf "%.2e" rbound))")
         plt.ylabel!(cost_plot, "cost")
         plt.xlabel!(cost_plot, "\$\\Gamma\$")
@@ -622,251 +618,6 @@ function budget_exceeding_RG1(
     end
 end #budget_exceeding_RG1
 
-function combined_hist_RG1(
-    inst::LotSizingInstance,
-    ;
-    N=100,
-    name=nothing,
-)
-    gammas = [0,2,4,6,10]
-
-    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
-    pes_bound = pes_value(inst_interval)
-
-    NBOUNDS = 5
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
-    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
-    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
-
-    all_plots = []
-    maxval = 0
-
-    raw_optplots = []
-    all_costs = []
-    case_experiment(inst, gammas,
-        with_gamma1,
-        LM.Model.create_opt_model
-    ) do _,_,xs,ys
-        costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
-
-        push!(all_costs, costs)
-    end
-
-    amin = minimum(minimum(costs) for costs in all_costs)
-    amax = maximum(maximum(costs) for costs in all_costs)
-
-    # Sturges rule
-    k = 1 + 2*ceil(Int64, log2(N))
-
-    plots = plot_histograms(
-        amin, amax, k, N,
-        gammas,
-        all_costs;
-        mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
-        rescale=true
-    )
-
-    plt.ylabel!(plots[begin], "Opt")
-    plt.plot!(plots[begin], left_margin = 25mm)
-
-    push!(all_plots, plots)
-    append!(raw_optplots, plots)
-
-    maxval = max(maxval, maximum(plt.ylims(plot)[end] for plot in plots))
-
-    raw_pesplots = []
-    all_costs = []
-    case_experiment(inst, gammas,
-        with_gamma1,
-        LM.Model.create_pes_model
-    ) do _,_,xs,ys
-        costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
-
-        push!(all_costs, costs)
-    end
-
-    amin = minimum(minimum(costs) for costs in all_costs)
-    amax = maximum(maximum(costs) for costs in all_costs)
-
-    # Sturges rule
-    k = 1 + 2*ceil(Int64, log2(N))
-
-    plots = plot_histograms(
-        amin, amax, k, N,
-        gammas,
-        all_costs;
-        mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
-        rescale=true
-    )
-
-    plt.ylabel!(plots[begin], "Pes")
-    plt.plot!(plots[begin], left_margin = 25mm)
-
-    push!(all_plots, plots)
-    append!(raw_pesplots, plots)
-
-    maxval = max(maxval, maximum(plt.ylims(plot)[end] for plot in plots))
-
-    raw_Rplots = []
-    for rbound in rbounds
-        inst1 = with_rbound(inst, rbound)
-
-        all_costs = []
-        case_experiment(inst1, gammas,
-            with_gamma1,
-            LM.Model.create_R_model;
-            optimize=RModel.optimizeRmodel!
-        ) do _,_,xs,ys
-            costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
-
-            push!(all_costs, costs)
-        end
-
-        amin = minimum(minimum(costs) for costs in all_costs)
-        amax = maximum(maximum(costs) for costs in all_costs)
-
-        # Sturges rule
-        k = 1 + 2*ceil(Int64, log2(N))
-
-        plots = plot_histograms(
-            amin, amax, k, N,
-            gammas,
-            all_costs;
-            mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
-            rescale=true
-        )
-
-        maxval = max(maxval, maximum(plt.ylims(plot)[end] for plot in plots))
-
-        for plot in plots
-            plt.vline!(plot, [rbound], legend=false)
-        end
-
-        push!(all_plots, plots)
-        push!(raw_Rplots, plots)
-    end
-
-    allhist = plt.Plot()
-
-    for row in all_plots
-        for plot in row
-            plt.ylims!(plot, (0.0, maxval))
-        end
-    end
-
-    for (i,row) in enumerate(raw_Rplots)
-        plt.ylabel!(row[begin], "R* C=$(rstring[i])pes")
-        plt.plot!(row[begin], left_margin = 25mm)
-    end
-    Rplots = reduce(vcat, raw_Rplots)
-
-    layout= @plt.layout [
-        plt.grid(2+length(rbounds), length(gammas))
-    ]
-
-    allhist = plt.plot(
-        raw_optplots...,
-        raw_pesplots...,
-        Rplots...;
-        layout=layout, 
-        size=(3000,2000),
-        plot_title="R* \$\\Gamma_1\$ histogram"
-    )
-
-    if isnothing(name)
-        println("Can't show multiple plots interactively.")
-    else
-        plt.savefig(allhist, "fig/$(name)_RG1_combined_hist.png")
-    end
-end #combined_hist_RG1
-
-function pareto_front(
-    inst::LotSizingInstance,
-    ;
-    name=nothing
-)
-    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
-    pes_bound = pes_value(inst_interval)
-
-    gammas = 0:inst.T
-    NBOUNDS = 6
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
-    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
-
-    plot = plt.Plot()
-    all_points = []
-
-    points = []
-    case_experiment(inst, gammas,
-        with_gamma1,
-        PesModel.create_pes_model
-    ) do _,_,xs,_
-        res = ExperimentUtils.get_cost_bounds(inst, collect(xs))
-
-        push!(points, res)
-    end
-    append!(all_points, points)
-
-    xs,ys = collect.(zip(points...))
-    plt.plot!(plot, xs, ys, seriestype=:scatter,
-        markershape=:diamond,
-        label="min-max")
-
-    points = []
-    case_experiment(inst, gammas,
-        with_gamma1,
-        OptModel.create_opt_model
-    ) do _,_,xs,_
-        res = ExperimentUtils.get_cost_bounds(inst, collect(xs))
-
-        push!(points, res)
-    end
-    append!(all_points, points)
-
-    xs,ys = collect.(zip(points...))
-    plt.plot!(plot, xs, ys, seriestype=:scatter,
-        markershape=:square,
-        label="min-min")
-
-    for (i,rbound) in enumerate(rbounds)
-        inst1 = with_rbound(inst, rbound)
-
-        points = []
-        case_experiment(inst1, gammas,
-            with_gamma1,
-            RModel.create_R_model,
-            optimize=RModel.optimizeRmodel!,
-        ) do _,_,xs,_
-            res = ExperimentUtils.get_cost_bounds(inst, collect(xs))
-
-            push!(points, res)
-        end
-        append!(all_points, points)
-
-
-        xs,ys = collect.(zip(points...))
-        plt.plot!(plot, xs, ys, seriestype=:scatter, label="R* b=$(rstring[i])")
-
-    end
-    front = ExperimentUtils.pareto_front(all_points)
-    xs,ys = collect.(zip(front...))
-    plt.plot!(plot, xs, ys,
-        linestyle=:dash,
-        label="Pareto front",
-        z_order=:back,
-    )
-
-    plt.ylabel!(plot, "Max cost")
-    plt.xlabel!(plot, "Min cost")
-    
-
-    if isnothing(name)
-        println("Can't show multiple plots interactively.")
-    else
-        plt.savefig(plot, "fig/$(name)_RG1_pareto.png")
-    end
-end
-
 function solution_evolution(inst; name=nothing)
     inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
     pes_bound = pes_value(inst_interval)
@@ -907,73 +658,3 @@ function solution_evolution(inst; name=nothing)
         plt.savefig(finalplot, "fig/$(name)_RG1_evolution.png")
     end
 end
-
-function experiments(name,path; skip_long=false)
-    println("# Experiment \"$(name)\"")
-    inst = LM.load_instance(path)
-
-    N = 10000
-
-    
-    
-    if !skip_long
-    println("### Combined hist G1")
-        combined_hist_RG1(inst, name=name, N=N)
-    end
-
-    return
-
-    println("### Cost Gamma1")
-        cost_RG1(inst; name=name)
-    println("### Cost Gamma2")
-        cost_RG2(inst; name=name)
-
-    println("### Pareto front")
-        pareto_front(inst, name=name)
-
-    println("### Solution evolution")
-        solution_evolution(inst, name=name)
-
-    
-
-    if !skip_long
-    println("### Histogram fix gamma G1")
-        hist_RG1_fixgamma(inst, name=name, N=N)
-    end
-
-    
-
-    if !skip_long
-    println("### Budget exceeding Gamma1")
-        budget_exceeding_RG1(inst; name=name, N=N)
-    end
-
-    if !skip_long
-    println("### Sample Gamma1")
-        sample_RG1(inst; name=name, N=N)
-    end
-
-    if !skip_long
-    println("### Sample override Gamma1")
-        sample_override_RG1(inst; name=name, N=N)
-    end
-
-
-    if !skip_long
-    println("### Sample Gamma2")
-        sample_RG2(inst; name=name, N=N)
-    end
-
-    if !skip_long
-    println("### Histogram Gamma1")
-        hist_RG1(inst; name=name, N=N)
-    end
-end
-
-function run()
-    mkpath("fig")
-
-    experiments("10_21_1", "data/gen/10_21_1.dat")
-    # experiments("10_41_1", "data/gen/10_41_1.dat")
-    # experiments("15_31_1", "data/gen/15_31_1.dat", skip_long=true)
-end #run
