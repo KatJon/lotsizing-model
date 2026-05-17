@@ -238,7 +238,7 @@ function combined_hist_RG1(
             titlefontsize=20,
             yguidefontsize=20,
             xguidefontsize=18,
-            tickfontsize=12,
+            tickfontsize=16,
             xformatter=(isnothing(scale) ? nothing : 
                 x -> x / scale)
         )
