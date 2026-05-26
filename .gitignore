@@ -27,4 +27,7 @@ Manifest*.toml
 LocalPreferences.toml
 JuliaLocalPreferences.toml
 
+.CondaPkg
+
 fig.zip
+

@@ -123,6 +123,7 @@ function plot_histograms(
     mktitle=nothing,
     rescale=false,
     perc90=false,
+    hideyaxis=false,
 )
     plots=[]
 
@@ -156,7 +157,17 @@ function plot_histograms(
         for (plot, row) in zip(plots, all_data)
             perc90val = StatsBase.percentile(row, 90)
 
-            plt.vline!(plot, [perc90val], color=:black, legend=false)
+            plt.vline!(plot, [perc90val],
+                color=:black,
+                linewidth=3,
+                legend=false,
+            )
+        end
+    end
+
+    for (i,plot) in enumerate(plots)
+        if i != 1 && hideyaxis
+            plt.plot!(plot; yformatter=:none, ygrid=true)
         end
     end
 

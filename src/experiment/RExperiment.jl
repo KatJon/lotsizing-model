@@ -4,6 +4,7 @@ import .LM.StatUtils
 import .LM.RModel
 import .LM.PesModel
 import .LM.OptModel
+import .LM.Deterministic
 using .LM.Instance
 using .LM.ExperimentUtils
 
@@ -126,36 +127,52 @@ function combined_hist_RG1(
     ## Stats table
 
     table_rows = []
+
+    # Det problem for stats
+    det_model,x,y = Deterministic.create_deterministic(inst)
+    JuMP.optimize!(det_model)
+    xs = collect(JuMP.value.(x))
+    ys = collect(JuMP.value.(y))
+    det_costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+    det_stats = ExperimentUtils.experiment_stats(det_costs)
+
+    line = ExperimentUtils.stats_table_row(det_stats, "-", model="\$\\textsc{Det}\$\n")
+    push!(table_rows, line)
+    push!(table_rows, "\\hline")
+    push!(table_rows, "\\hline")
+
     for (i,row) in enumerate(pes_stats)
         line = ExperimentUtils.stats_table_row(row, gammas[i],
-            model=i>1 ? nothing : "\\textsc{MinMax}\n")
+            model=i>1 ? nothing : "\$\\textsc{Min-Max}\$\n")
 
         push!(table_rows, line)
     end
+    push!(table_rows, "\\hline")
     push!(table_rows, "\\hline")
 
     for (j, row_stats) in enumerate(r_stats)
         for (i,row) in enumerate(row_stats)
             line = ExperimentUtils.stats_table_row(row, gammas[i],
-                model=i>1 ? nothing : "R* $(rstring[j])pes\n"
+                model=i>1 ? nothing : "\$R^*($(rstring[j]))\$\n"
             )
 
             push!(table_rows, line)
         end
 
         push!(table_rows, "\\hline")
+        push!(table_rows, "\\hline")
     end
 
     for (i,row) in enumerate(opt_stats)
         line = ExperimentUtils.stats_table_row(row, gammas[i],
-            model=(i>1 ? nothing : "\\textsc{MinMin}\n"),
+            model=(i>1 ? nothing : "\$\\textsc{Min-Min}\$\n"),
             skipnl=(i==length(opt_stats)),
         )
 
         push!(table_rows, line)
     end
 
-    table_path = "fig/$(name)_combined_stats.txt"
+    table_path = "results/$(name)_combined_stats.txt"
     table_content = join(table_rows, "\n")
     open(table_path, "w") do file
         write(file, table_content)
@@ -171,12 +188,13 @@ function combined_hist_RG1(
         xmin, xmax, k, N, 
         gammas,
         pes_costs;
-        mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
+        mktitle=gamma -> "\$\\Gamma^d = $(gamma)\$",
         rescale=true,
         perc90=true,
+        hideyaxis=true,
     )
 
-    plt.ylabel!(pes_plots[begin], "MinMax")
+    plt.ylabel!(pes_plots[begin], "Min-Max")
     plt.plot!(pes_plots[begin], left_margin = 25mm)
     ymax = max(ymax, maximum(plt.ylims(plot)[end] for plot in pes_plots))
 
@@ -193,13 +211,18 @@ function combined_hist_RG1(
             # mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
             rescale=true,
             perc90=true,
+            hideyaxis=true,
         )
 
         for plot in plots
-            plt.vline!(plot, [rbound], color=:red, legend=false)
+            plt.vline!(plot, [rbound],
+                color=:red,
+                linewidth=3,
+                legend=false,
+            )
         end
 
-        plt.ylabel!(plots[begin], "R* C=$(rstring[i])pes")
+        plt.ylabel!(plots[begin], "R* ($(rstring[i]))")
         plt.plot!(plots[begin], left_margin = 25mm)
         ymax = max(ymax, maximum(plt.ylims(plot)[end] for plot in plots))
 
@@ -216,9 +239,10 @@ function combined_hist_RG1(
         # mktitle=gamma -> "\$\\Gamma_1 = $(gamma)\$",
         rescale=true,
         perc90=true,
+        hideyaxis=true,
     )
 
-    plt.ylabel!(opt_plots[begin], "MinMin")
+    plt.ylabel!(opt_plots[begin], "Min-Min")
     plt.plot!(opt_plots[begin], left_margin = 25mm)
     if !isnothing(scale)
         for plot in opt_plots
@@ -235,10 +259,11 @@ function combined_hist_RG1(
         plt.ylims!(plot, (0.0, ymax))
         plt.xlims!(plot, (xmin, xmax))
         plt.plot!(plot,
-            titlefontsize=20,
-            yguidefontsize=20,
-            xguidefontsize=18,
-            tickfontsize=16,
+            titlefontsize=26,
+            yguidefontsize=26,
+            xguidefontsize=26,
+            tickfontsize=22,
+            ytick_direction=:in,
             xformatter=(isnothing(scale) ? nothing : 
                 x -> x / scale)
         )
@@ -253,14 +278,13 @@ function combined_hist_RG1(
         ;
         layout=layout, 
         size=(3000,2000),
-        plot_title="$(name) \$\\Gamma_1\$ Histogram",
         plot_titlefontsize=24,
     )
 
     if isnothing(name)
         println("Can't show multiple plots interactively.")
     else
-        plt.savefig(allhist, "fig/$(name)_RG1_combined_hist.png")
+        plt.savefig(allhist, "results/$(name)_RG1_combined_hist.pdf")
     end
 end #combined_hist_RG1
 
@@ -306,7 +330,7 @@ function pareto_front(
         markershape=:diamond,
         markersize=8,
         markerstrokewidth=1,
-        label="Min-max",
+        label="Min-Max",
         color=:Spectral,
     )
 
@@ -331,7 +355,7 @@ function pareto_front(
         markershape=:square,
         markersize=8,
         markerstrokewidth=1,
-        label="Min-min",
+        label="Min-Min",
         color=:Spectral,
     )
 
@@ -358,7 +382,7 @@ function pareto_front(
 
         xs,ys = collect.(zip(points...))
         plt.plot!(plot, xs, ys, seriestype=:scatter,
-            label="R* \$C=$(rstring[i])\$",
+            label="R*\$($(rstring[i]))\$",
             marker_z=gammas,
             markershape=RMARKERS[i],
             markersize=8,
@@ -376,25 +400,28 @@ function pareto_front(
         z_order=:back,
     )
 
-    ylabel = "Max cost" * (isnothing(scale) ? "" : " $(scalefmt)") 
+    ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)") 
     plt.ylabel!(plot, ylabel)
-    xlabel = "Min cost" * (isnothing(scale) ? "" : " $(scalefmt)")
+    xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
     plt.xlabel!(plot, xlabel)
-    plt.title!(plot, "$(name) Bicriterial Analysis")
     plt.plot!(plot,
         size=(1000,750),
         left_margin=5mm,
-        legend_font_pointsize=11,
+        legend_font_pointsize=12,
+        tickfontsize=12,
+        guidefontsize=14,
+        colorbar_title="\$\\Gamma^d\$",
+        colorbar_titlefontsize=14,
     )
 
     if isnothing(name)
         println("Can't show multiple plots interactively.")
     else
-        plt.savefig(plot, "fig/$(name)_RG1_pareto.png")
+        plt.savefig(plot, "results/$(name)_RG1_pareto.pdf")
     end
 end
 
-function experiments(name,path; skip_long=false)
+function experiments(name,path; skip_long=false, histgammas=nothing)
     println("# Experiment \"$(name)\"")
     inst = LM.load_instance(path)
 
@@ -403,22 +430,24 @@ function experiments(name,path; skip_long=false)
     if !skip_long
     println("### Combined hist G1")
         combined_hist_RG1(inst, name=name, N=N,
+            gammas=histgammas,
             scale=1e5,
-            scalefmt="\$[10^5]\$")
+            scalefmt="\$\\cdot 10^5\$")
     end
 
     println("### Pareto front")
         pareto_front(inst, name=name,
             scale=1e5,
-            scalefmt="\$[10^5]\$")
+            scalefmt="\$\\cdot 10^5\$")
     
     println("Done.")
 end
 
 function run()
-    mkpath("fig")
+    mkpath("results")
 
-    # experiments("15_31_1", "data/gen/15_31_1.dat")
     experiments("10_21_1", "data/gen/10_21_1.dat")
-    # experiments("10_41_1", "data/gen/10_41_1.dat")
+    experiments("15_31_1", "data/gen/15_31_1.dat",
+        histgammas=[2,5,8,10,13],
+    )
 end #run
