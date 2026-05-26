@@ -8,7 +8,7 @@
 4 4
 ## capacity
 4 4
-# lead time
+# common lead time
 2
 ## late
 1 1
@@ -22,6 +22,6 @@
 ## backordering
 4 4 4
 # uncertainty modelling
-GAMMA1 3
+GAMMA1 1
 # R* bound
 R* 18

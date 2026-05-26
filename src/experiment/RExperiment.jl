@@ -247,7 +247,7 @@ function combined_hist_RG1(
     if !isnothing(scale)
         for plot in opt_plots
             plt.xlabel!(plot, "Cost $(scalefmt)")
-            plt.plot!(plot, bottom_margin = 10mm)
+            plt.plot!(plot, bottom_margin = 20mm)
         end
     end
     ymax = max(ymax, maximum(plt.ylims(plot)[end] for plot in opt_plots))
@@ -259,10 +259,10 @@ function combined_hist_RG1(
         plt.ylims!(plot, (0.0, ymax))
         plt.xlims!(plot, (xmin, xmax))
         plt.plot!(plot,
-            titlefontsize=26,
-            yguidefontsize=26,
-            xguidefontsize=26,
-            tickfontsize=22,
+            titlefontsize=30,
+            yguidefontsize=30,
+            xguidefontsize=30,
+            tickfontsize=26,
             ytick_direction=:in,
             xformatter=(isnothing(scale) ? nothing : 
                 x -> x / scale)
@@ -277,7 +277,7 @@ function combined_hist_RG1(
         all_plots...,
         ;
         layout=layout, 
-        size=(3000,2000),
+        size=(3000,3000),
         plot_titlefontsize=24,
     )
 
@@ -435,10 +435,10 @@ function experiments(name,path; skip_long=false, histgammas=nothing)
             scalefmt="\$\\cdot 10^5\$")
     end
 
-    println("### Pareto front")
-        pareto_front(inst, name=name,
-            scale=1e5,
-            scalefmt="\$\\cdot 10^5\$")
+    # println("### Pareto front")
+    #     pareto_front(inst, name=name,
+    #         scale=1e5,
+    #         scalefmt="\$\\cdot 10^5\$")
     
     println("Done.")
 end

@@ -71,4 +71,12 @@ If you reference the article, use this code or dataset, please cite the manuscri
 
 ## Contact
 
-For questions regarding
+For questions regarding the article, implementation, or datasets, please contact:
+
+Szymon Wróbel
+
+Department of Fundamentals of Computer Science
+
+Wrocław University of Science and Technology
+
+email: [szymon.wrobel@pwr.edu.pl](mailto:szymon.wrobel@pwr.edu.pl)
