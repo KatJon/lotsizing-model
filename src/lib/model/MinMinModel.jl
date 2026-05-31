@@ -1,5 +1,5 @@
 __precompile__(true)
-module OptModel
+module MinMinModel
 
 using ..Instance
 using ..Utils
@@ -8,35 +8,79 @@ import ..MinMinGraph as OptG
 
 using ..CommonModel
 
-using ..OptModel
-
 using JuMP
 
-export create_opt_model
+export create_minmin_model
+export minmin_variables
+export minmin_constraints
+export minmin_objective
 
 get_opt_arrivals(inst::LotSizingInstance, rho) = [
     findfirstvalue(j -> value(rho[t,j]) == 1, feasible_arrival_times(inst, t)) 
         for t in prod_periods(inst)]
 
-function create_opt_variables(inst, model, graph)
+"""
+Create variables for Min-Min model
+
+Arguments:
+* inst - LotSizingInstance,
+* model - model in which the variables are created,
+* graph - MinMinGraph.
+
+Returns: tuple of
+* rho - array of binary variables denoting realization of the lead time,
+* flow - array of continuous variables denoting flow between graph nodes.
+"""
+function minmin_variables(inst::LotSizingInstance, model, graph)
     @variable(model, 
         rho[t=prod_periods(inst), j=feasible_arrival_times(inst, t)], Bin)
     @variable(model,
         flow[u=OptG.eachnode(graph), v=OptG.eachnode(graph); OptG.is_arc(graph, u, v)] >= 0)
 
     return rho,flow
-end #create_opt_variables
+end #minmin_variables
 
-function opt_objective(inst, graph, flow, y)
+"""
+Create expression for objective in Min-Min model.
+
+Arguments:
+* inst - LotSizingInstance,
+* graph - MinMinGraph,
+* flow - array of flow variables,
+* y - vector of y variables.
+
+Returns:
+Expression for objective in Min-Min model.
+"""
+function minmin_objective(
+    inst::LotSizingInstance,
+    graph, flow, y,
+)
     arc_flow_cost(arc::OptG.Arc) = arc.cost * flow[arc.src,arc.dst]
 
     return (
         sum(arc_flow_cost(graph.arcs[iarc]) for iarc in OptG.eacharc(graph)) +
         sum(inst.setup_cost[t]*y[t] for t in prod_periods(inst))
     )
-end #opt_objective
+end #minmin_objective
 
-function opt_constraints(inst, model, graph, rho, flow, x)
+"""
+Add Min-Min constraints to model.
+
+Arguments:
+* inst - LotSizingInstance
+* model - JuMP model
+* graph - MinMinGraph
+* rho - array of lead time realization variables
+* flow - array of flow amount variables
+* x - vector of production amount variables
+"""
+function minmin_constraints(
+    inst::LotSizingInstance,
+    model,
+    graph,
+    rho, flow, x,
+)
     # (43)
     @constraint(model, [t=prod_periods(inst)],
         sum(rho[t,j] for j in feasible_arrival_times(inst, t)) == 1)
@@ -108,9 +152,28 @@ function opt_constraints(inst, model, graph, rho, flow, x)
             >= 0
         )
     end
-end #opt_constraints
+end #minmin_constraints
 
-function create_opt_model(
+"""
+Create Min-Min model based on equations (?)-(?) TODO: update
+
+Arguments:
+* inst - LotSizingInstance
+
+Optional arguments:
+* make_optimizer - (default: create_highs) optimizer factory function
+* time_limit - (default: 300) time limit in seconds
+
+Returns: tuple of
+* model - JuMP model
+* x - vector of production quantity variables
+* y - vector of setup variables
+* rho - array of lead time realization variables
+* far_future_backordering - far future backordering quantity variable
+* flow - array of flow variables
+* graph - MinMinGraph
+"""
+function create_minmin_model(
     inst::LotSizingInstance;
     make_optimizer = Utils.create_highs,
     time_limit = 5*60,
@@ -121,15 +184,15 @@ function create_opt_model(
     graph = OptG.create_minmin_graph(inst)
 
     ## Variables
-    x,y = create_common_variables(inst, model)
-    rho,flow = create_opt_variables(inst, model, graph)
+    x,y = common_variables(inst, model)
+    rho,flow = minmin_variables(inst, model, graph)
 
     ## Objective
     @objective(model, Min,
-        opt_objective(inst, graph, flow, y))
+        minmin_objective(inst, graph, flow, y))
 
     ## Constraints (43)-(48)
-    opt_constraints(inst, model, graph, rho, flow, x)
+    minmin_constraints(inst, model, graph, rho, flow, x)
 
     # (49)
     @constraint(model, [t=prod_periods(inst)],
@@ -138,7 +201,7 @@ function create_opt_model(
     far_future_backordering = flow[OptG.isnode(graph), OptG.ivnode(graph, inst.Tplus)]
     
     return model, x, y, rho, far_future_backordering, flow, graph
-end #create_opt_model
+end #create_minmin_model
 
 function opt_scenario_cost(
     inst::LotSizingInstance,
@@ -155,15 +218,15 @@ function opt_scenario_cost(
     graph = OptG.create_minmin_graph(inst)
     
     ## Variables
-    rho,flow = create_opt_variables(inst, model, graph)
+    rho,flow = minmin_variables(inst, model, graph)
 
     ## Objective
     @objective(model, Min,
-        opt_objective(inst, graph, flow, ys))
+        minmin_objective(inst, graph, flow, ys))
 
-    opt_constraints(inst, model, graph, rho, flow, xs)
+    minmin_constraints(inst, model, graph, rho, flow, xs)
 
     return model
 end #opt_scenario_cost
 
-end #OptModel
+end #MinMinModel

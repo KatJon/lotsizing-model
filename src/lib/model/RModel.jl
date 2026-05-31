@@ -7,8 +7,8 @@ import ..MinMinGraph as OptG
 import ..MinMaxGraph as PesG
 
 using ..CommonModel
-using ..OptModel
-using ..PesModel
+using ..MinMinModel
+using ..MinMaxModel
 
 using Accessors: @set
 using JuMP
@@ -47,25 +47,25 @@ function create_R_model(
     pgraph = PesG.create_minmax_graph(pinst)
 
     ## Variables
-    x,y = create_common_variables(inst, model)
-    rho,flow = OptModel.create_opt_variables(inst, model, ograph)
-    z = PesModel.create_pes_variables(pinst, model, pgraph)
+    x,y = common_variables(inst, model)
+    rho,flow = MinMinModel.minmin_variables(inst, model, ograph)
+    z = MinMaxModel.create_pes_variables(pinst, model, pgraph)
 
     ## Objective
     @objective(model, Min,
-        OptModel.opt_objective(inst, ograph, flow, y))
+        MinMinModel.minmin_objective(inst, ograph, flow, y))
 
     ## Constraints
     # (54)
     B = inst.rbound
     @constraint(model,
-        PesModel.pes_objective(pinst, pgraph, z, x, y) <= B)
+        MinMaxModel.pes_objective(pinst, pgraph, z, x, y) <= B)
 
     # (35)-(37)
-    PesModel.pes_constraints(pinst, model, pgraph, z, x)
+    MinMaxModel.pes_constraints(pinst, model, pgraph, z, x)
 
     # (43)-(48)
-    OptModel.opt_constraints(inst, model, ograph, rho, flow, x)
+    MinMinModel.minmin_constraints(inst, model, ograph, rho, flow, x)
 
     # (38) & (49)
     @constraint(model, [t=prod_periods(inst)],
@@ -92,7 +92,7 @@ function optimizeRmodel!(inst, model, x, y)
         return model,x,y
     end
 
-    pmodel,px,py = PesModel.create_pes_model(inst)
+    pmodel,px,py = MinMaxModel.create_pes_model(inst)
 
     optimize!(pmodel)
 

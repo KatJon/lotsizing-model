@@ -3,8 +3,8 @@ module ExperimentUtils
 import LotsizingModel as LM
 
 import .LM.StatUtils
-import .LM.OptModel
-import .LM.PesModel
+import .LM.MinMinModel
+import .LM.MinMaxModel
 using .LM.Instance
 
 import Plots as plt
@@ -217,10 +217,10 @@ function make_cost_plot(
 end #make_cost_plot
 
 function get_cost_bounds(inst::LotSizingInstance, xs::Vector{Float64})
-    mmin = OptModel.opt_scenario_cost(inst,xs)
+    mmin = MinMinModel.opt_scenario_cost(inst,xs)
     JuMP.optimize!(mmin)
 
-    mmax = PesModel.pes_scenario_cost(inst, xs)
+    mmax = MinMaxModel.pes_scenario_cost(inst, xs)
     JuMP.optimize!(mmax)
 
     return JuMP.objective_value.((mmin,mmax))

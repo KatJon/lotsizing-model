@@ -5,9 +5,20 @@ using ..Instance
 
 using JuMP
 
-export create_common_variables
+export common_variables
 
-function create_common_variables(inst::LotSizingInstance, model)
+"""
+Create common variables for Lot Sizing models.
+
+Arguments:
+* inst - LotSizingInstance,
+* model - JuMP model in which variables will be created.
+
+Returns: tuple of
+* x - vector of production amount variables
+* y - vector of setup variables
+"""
+function common_variables(inst::LotSizingInstance, model)
     @variable(model,
         y[t=prod_periods(inst)], Bin)
 
@@ -15,6 +26,6 @@ function create_common_variables(inst::LotSizingInstance, model)
         0 <= x[t=prod_periods(inst)] <= inst.production_capacity[t])
 
     return x,y
-end #create_common_variables
+end #common_variables
 
 end #CommonModel

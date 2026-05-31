@@ -9,8 +9,8 @@ include("lib/Parse.jl")
 include("lib/graph/MinMinGraph.jl")
 include("lib/graph/MinMaxGraph.jl")
 include("lib/model/CommonModel.jl")
-include("lib/model/OptModel.jl")
-include("lib/model/PesModel.jl")
+include("lib/model/MinMinModel.jl")
+include("lib/model/MinMaxModel.jl")
 include("lib/model/RModel.jl")
 include("lib/model/Model.jl")
 include("lib/model/PseudoPoly.jl")
@@ -64,7 +64,7 @@ function run_minmax_model(instance::Instance.LotSizingInstance)
     JuMP.optimize!(model)
 
     if !JuMP.is_solved_and_feasible(model)
-        println("PesModel: Instance is infeasible")
+        println("MinMaxModel: Instance is infeasible")
         return
     end
 
@@ -77,12 +77,12 @@ end #run_pes_model
 
 function run_minmin_model(instance::Instance.LotSizingInstance)
     println("Building min-min model")
-    @time model,x,_,rho,far_future_backordering = Model.create_opt_model(instance)
+    @time model,x,_,rho,far_future_backordering = Model.create_minmin_model(instance)
 
     JuMP.optimize!(model)
 
     if !JuMP.is_solved_and_feasible(model)
-        println("OptModel: Instance is infeasible")
+        println("MinMinModel: Instance is infeasible")
         return
     end
 
@@ -164,7 +164,7 @@ function __cold_start()
     )
     model1,_ = Model.create_pes_model(instance)
     JuMP.optimize!(model1)
-    model2,_ = Model.create_opt_model(instance)
+    model2,_ = Model.create_minmin_model(instance)
     JuMP.optimize!(model2)
     model3,_ = Model.create_R_model(instance)
     JuMP.optimize!(model3)

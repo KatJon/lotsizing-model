@@ -1,8 +1,8 @@
 __precompile__(true)
-module PesModel
+module MinMaxModel
 
-using ..Utils
 using ..Instance
+using ..Utils
 
 import ..MinMaxGraph as PesG
 
@@ -72,7 +72,7 @@ function create_pes_model(
     graph = PesG.create_minmax_graph(inst)
 
     ## Variables
-    x,y = create_common_variables(inst, model)
+    x,y = common_variables(inst, model)
     z = create_pes_variables(inst, model, graph)
 
     ## Objective
@@ -119,4 +119,4 @@ function pes_scenario_cost(
     return model
 end #pes_scenario_cost
 
-end #PesModel
+end #MinMaxModel

@@ -23,8 +23,8 @@ function checkGamma0(inst::LotSizingInstance)
     gDinst = @set inst.uncertainty=Uncertainty.Model(Uncertainty.GammaD, 0)
     gCinst = @set inst.uncertainty=Uncertainty.Model(Uncertainty.GammaC, 0)
 
-    optgD_cost = get_cost(LM.Model.create_opt_model(gDinst))
-    optgC_cost = get_cost(LM.Model.create_opt_model(gCinst))
+    optgD_cost = get_cost(LM.Model.create_minmin_model(gDinst))
+    optgC_cost = get_cost(LM.Model.create_minmin_model(gCinst))
 
     pesgD_cost = get_cost(LM.Model.create_pes_model(gDinst))
     pesgC_cost = get_cost(LM.Model.create_pes_model(gCinst))

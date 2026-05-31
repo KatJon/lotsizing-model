@@ -1,12 +1,12 @@
 __precompile__(true)
 module Model
 
-import ..OptModel
-create_opt_model = OptModel.create_opt_model
-export create_opt_model
+import ..MinMinModel
+create_minmin_model = MinMinModel.create_minmin_model
+export create_minmin_model
 
-import ..PesModel
-create_pes_model = PesModel.create_pes_model
+import ..MinMaxModel
+create_pes_model = MinMaxModel.create_pes_model
 export create_pes_model
 
 import ..RModel

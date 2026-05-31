@@ -2,8 +2,8 @@ import LotsizingModel as LM
 
 import .LM.StatUtils
 import .LM.RModel
-import .LM.PesModel
-import .LM.OptModel
+import .LM.MinMaxModel
+import .LM.MinMinModel
 import .LM.Deterministic
 using .LM.Instance
 
@@ -23,7 +23,7 @@ function opt_value(
     inst::LotSizingInstance;
     make_optimizer=LM.Utils.create_highs
 )
-    model, = LM.Model.create_opt_model(inst; make_optimizer=make_optimizer)
+    model, = LM.Model.create_minmin_model(inst; make_optimizer=make_optimizer)
 
     optimize!(model)
 
@@ -115,7 +115,7 @@ function combined_hist_RG1(
     opt_stats = []
     case_experiment(inst, gammas,
         with_gammaD,
-        LM.Model.create_opt_model,
+        LM.Model.create_minmin_model,
         make_optimizer=create_gurobi,
     ) do _,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
@@ -361,7 +361,7 @@ function pareto_front(
     mean_stddev_points = []
     case_experiment(inst, gammas,
         with_gammaD,
-        PesModel.create_pes_model,
+        MinMaxModel.create_pes_model,
         make_optimizer=make_optimizer,
     ) do _,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
@@ -407,7 +407,7 @@ function pareto_front(
     mean_stddev_points = []
     case_experiment(inst, gammas,
         with_gammaD,
-        OptModel.create_opt_model,
+        MinMinModel.create_minmin_model,
         make_optimizer=make_optimizer,
     ) do _,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]

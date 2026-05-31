@@ -15,7 +15,7 @@ function time_periods(inst::LotSizingInstance)
     return tprod,tfut
 end
 
-function opt_variables(
+function mip_minmin_variables(
     inst::LotSizingInstance,
     model::Model,
 )
@@ -29,7 +29,7 @@ function opt_variables(
     return B,I,rho,fl
 end
 
-function opt_constraints(
+function mip_minmin_constraints(
     inst::LotSizingInstance,
     model::Model,
     x, y, B, I, rho, fl,
@@ -95,7 +95,7 @@ function opt_constraints(
     end
 end
 
-function opt_objective(
+function mip_minmin_objective(
     inst::LotSizingInstance,
     x, y, B, I,
 )
@@ -118,21 +118,21 @@ Create direct MIP model for the min-min problem.
 Arguments:
 * inst - LotSizingInstance
 """
-function opt_model(inst::LotSizingInstance)
+function mip_minmin_model(inst::LotSizingInstance)
     model = JuMP.Model(create_highs)
 
     tprod,tfut = time_periods(inst)
 
-    x,y = create_common_variables(inst, model)
+    x,y = common_variables(inst, model)
 
-    B,I,rho,fl = opt_variables(inst, model)
+    B,I,rho,fl = mip_minmin_variables(inst, model)
 
     # production can happen only after setup
     @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
 
-    opt_constraints(inst, model, x, y, B, I, rho, fl)
+    mip_minmin_constraints(inst, model, x, y, B, I, rho, fl)
 
-    @objective(model, Min, opt_objective(inst, x, y, B, I))
+    @objective(model, Min, mip_minmin_objective(inst, x, y, B, I))
 
     return model,x,y
 end #opt_model
@@ -147,14 +147,13 @@ function opt_scenario_cost(
     model = JuMP.Model(make_optimizer)
     set_time_limit_sec(model, time_limit)
 
-
     ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
 
-    B,I,rho,fl = opt_variables(inst, model)
+    B,I,rho,fl = mip_minmin_variables(inst, model)
 
-    opt_constraints(inst, model, xs, ys, B, I, rho, fl)
+    mip_minmin_constraints(inst, model, xs, ys, B, I, rho, fl)
 
-    @objective(model, Min, opt_objective(inst, xs, ys, B, I))
+    @objective(model, Min, mip_minmin_objective(inst, xs, ys, B, I))
 
     return model
 end
@@ -201,7 +200,7 @@ function pes_model(inst::LotSizingInstance)
 
     tprod,tfut = time_periods(inst)
     
-    x,y = create_common_variables(inst, model)
+    x,y = common_variables(inst, model)
     
     @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
 
@@ -268,14 +267,14 @@ function R_model(
 
     tprod,tfut = time_periods(inst)
 
-    x,y = create_common_variables(inst, model)
+    x,y = common_variables(inst, model)
 
-    B,I,rho,fl = opt_variables(inst, model)
+    B,I,rho,fl = mip_minmin_variables(inst, model)
 
     # production can happen only after setup
     @constraint(model, [t=tprod], x[t] <= inst.production_capacity[t]*y[t])
 
-    opt_constraints(inst, model, x, y, B, I, rho, fl)
+    mip_minmin_constraints(inst, model, x, y, B, I, rho, fl)
 
     scenarios = Instance.list_scenarios(inst)
     NS = length(scenarios)
@@ -291,9 +290,7 @@ function R_model(
 
     @constraint(model, zmax <= inst.rbound)
 
-    @objective(model, Min, opt_objective(inst, x, y, B, I))
-
-    return model,x,y
+    @objective(model, Min, mip_minmin_objective(inst, x, y, B, I))
 
     return model,x,y
 end

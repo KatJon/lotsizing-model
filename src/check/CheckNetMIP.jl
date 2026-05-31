@@ -3,10 +3,8 @@ import LotsizingModel as LM
 import .LM.Instance
 import .LM.Model
 import .LM.MipModel
-import .LM.PesModel
-import .LM.OptModel
-
-using .LM.ExperimentUtils
+import .LM.MinMaxModel
+import .LM.MinMinModel
 
 using JuMP: JuMP, optimize!, objective_value
 using Accessors: @set,@reset
@@ -81,18 +79,19 @@ end
 
 function run(path="data/simpl.dat")
     inst = LM.load_instance(path)
-    inst = with_gammaD(inst, 2)
+    budget = Instance.Uncertainty.Model(Instance.Uncertainty.GammaD, 2)
+    inst = @set inst.uncertainty=budget
 
     println("# Optimistic")
-    moptnet,xoptnet,yoptnet = Model.create_opt_model(inst)
-    moptmip,xoptmip,yoptmip = MipModel.opt_model(inst)
+    moptnet,xoptnet,yoptnet = Model.create_minmin_model(inst)
+    moptmip,xoptmip,yoptmip = MipModel.mip_minmin_model(inst)
 
     compare_models(moptnet, moptmip)
 
     compare_scenarios(inst,
         moptnet, collect(JuMP.value.(xoptnet)),
         moptmip, collect(JuMP.value.(xoptmip)),
-        OptModel.opt_scenario_cost,
+        MinMinModel.opt_scenario_cost,
         MipModel.opt_scenario_cost,
     )
 
@@ -106,14 +105,14 @@ function run(path="data/simpl.dat")
     compare_scenarios(inst,
         mpesnet, collect(JuMP.value.(xpesnet)),
         mpesmip, collect(JuMP.value.(xpesmip)),
-        PesModel.pes_scenario_cost,
+        MinMaxModel.pes_scenario_cost,
         MipModel.pes_scenario_cost,
     )
     #=================#
 
     println("# R* model")
     pesval = objective_value(mpesnet)
-    inst1 = with_rbound(inst,1.2*pesval)
+    inst1 = @set inst.rbound=1.2*pesval
     mrnet,xrnet = Model.create_R_model(inst1)
     mrmip,xrmip = MipModel.R_model(inst1)
 
@@ -121,7 +120,7 @@ function run(path="data/simpl.dat")
     compare_scenarios(inst,
         mrnet, collect(JuMP.value.(xrnet)),
         mrmip, collect(JuMP.value.(xrmip)),
-        OptModel.opt_scenario_cost,
+        MinMinModel.opt_scenario_cost,
         MipModel.opt_scenario_cost,
     )
 end

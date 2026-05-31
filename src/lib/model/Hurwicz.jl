@@ -10,8 +10,8 @@ import ..MinMinGraph as OptG
 import ..MinMaxGraph as PesG
 
 using ..CommonModel
-import ..OptModel
-import ..PesModel
+import ..MinMinModel
+import ..MinMaxModel
 import ..Model
 
 export create_hurwicz_model
@@ -32,20 +32,20 @@ function create_hurwicz_model(
     pgraph = PesG.create_minmax_graph(inst)
 
     ## Variables
-    x,y = create_common_variables(inst, model)
-    rho,flow = OptModel.create_opt_variables(inst, model, ograph)
-    z = PesModel.create_pes_variables(inst, model, pgraph)
+    x,y = common_variables(inst, model)
+    rho,flow = MinMinModel.minmin_variables(inst, model, ograph)
+    z = MinMaxModel.create_pes_variables(inst, model, pgraph)
 
     ## Objective
     @objective(model, Min,
-       alpha*PesModel.pes_objective(inst, pgraph, z, x, y) +
-       (1-alpha)*OptModel.opt_objective(inst, ograph, flow, y))
+       alpha*MinMaxModel.pes_objective(inst, pgraph, z, x, y) +
+       (1-alpha)*MinMinModel.minmin_objective(inst, ograph, flow, y))
 
     ## Constraints
 
-    PesModel.pes_constraints(inst, model, pgraph, z, x)
+    MinMaxModel.pes_constraints(inst, model, pgraph, z, x)
 
-    OptModel.opt_constraints(inst, model, ograph, rho, flow, x)
+    MinMinModel.minmin_constraints(inst, model, ograph, rho, flow, x)
 
     @constraint(model, [t=prod_periods(inst)],
         x[t] <= M * y[t])
