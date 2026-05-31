@@ -26,8 +26,8 @@ function checkGamma0(inst::LotSizingInstance)
     optgD_cost = get_cost(LM.Model.create_minmin_model(gDinst))
     optgC_cost = get_cost(LM.Model.create_minmin_model(gCinst))
 
-    pesgD_cost = get_cost(LM.Model.create_pes_model(gDinst))
-    pesgC_cost = get_cost(LM.Model.create_pes_model(gCinst))
+    pesgD_cost = get_cost(LM.Model.create_minmax_model(gDinst))
+    pesgC_cost = get_cost(LM.Model.create_minmax_model(gCinst))
 
     rgDinst = @set gDinst.rbound=pesgD_cost
     rgCinst = @set gCinst.rbound=pesgC_cost

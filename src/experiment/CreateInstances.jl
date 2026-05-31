@@ -1,6 +1,7 @@
 import LotsizingModel as LM
 
-using .LM.GenInstance
+include("./GenInstance.jl")
+using .GenInstance
 
 """
 Generate an instance for LotSizing Problem

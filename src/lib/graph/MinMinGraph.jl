@@ -42,27 +42,28 @@ end
 
 Base.show(io::IO, g::Graph) = print(io, "Nodes: ", g.nodes, "\nArcs: ", g.arcs)
 
-
+"Return all nodes of graph `g`."
 @memoize function eachnode(g::Graph)
     return eachindex(g.nodes)
 end
 
+"Return all arcs of graph `g`."
 @memoize function eacharc(g::Graph)
     return eachindex(g.arcs)
 end
 
 """
-Get id of S node
+Get id of S node in graph `g`.
 """
 isnode(g::Graph) = 1
 
 """
-Get id of node u_t, t in [T]
+Get id of node u_t, t in [T] in graph `g`.
 """
 iunode(g::Graph, t) = g._unodes + t
 
 """
-Get id of node v_t, t in [T+]
+Get id of node v_t, t in [T+] in graph `g`.
 """
 ivnode(g::Graph, t) = g._vnodes + t
 
@@ -91,6 +92,14 @@ end
 end
 
 """
+Create Min-Min graph according to section (?) (TODO: update).
+
+Arguments:
+* inst - LotSizingInstance.
+
+Returns: MinMinGraph
+
+Additional informations:
 Node order:
 S,u_1,...,u_T,v_T+1,...,V_T+
 """

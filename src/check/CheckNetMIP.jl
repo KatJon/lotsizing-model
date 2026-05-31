@@ -98,8 +98,8 @@ function run(path="data/simpl.dat")
     #=================#
 
     println("# Pessimistic")
-    mpesnet,xpesnet = Model.create_pes_model(inst)
-    mpesmip,xpesmip = MipModel.pes_model(inst)
+    mpesnet,xpesnet = Model.create_minmax_model(inst)
+    mpesmip,xpesmip = MipModel.mip_minmax_model(inst)
 
     compare_models(mpesnet, mpesmip)
     compare_scenarios(inst,
@@ -114,7 +114,7 @@ function run(path="data/simpl.dat")
     pesval = objective_value(mpesnet)
     inst1 = @set inst.rbound=1.2*pesval
     mrnet,xrnet = Model.create_R_model(inst1)
-    mrmip,xrmip = MipModel.R_model(inst1)
+    mrmip,xrmip = MipModel.mip_R_model(inst1)
 
     compare_models(mrnet, mrmip)
     compare_scenarios(inst,

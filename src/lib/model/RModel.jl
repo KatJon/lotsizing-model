@@ -22,7 +22,7 @@ Arguments:
 Optional arguments:
 * make_optimizer - (default: create_highs) optimizer factory
 * time_limit - (default: 5*60 s) time limit in seconds
-* override_R_uncertainty - override uncertainty for the R* bound 
+* override_R_uncertainty - override uncertainty budget in the R* bound 
 """
 function create_R_model(
     inst::LotSizingInstance;
@@ -49,7 +49,7 @@ function create_R_model(
     ## Variables
     x,y = common_variables(inst, model)
     rho,flow = MinMinModel.minmin_variables(inst, model, ograph)
-    z = MinMaxModel.create_pes_variables(pinst, model, pgraph)
+    z = MinMaxModel.minmax_variables(pinst, model, pgraph)
 
     ## Objective
     @objective(model, Min,
@@ -57,12 +57,12 @@ function create_R_model(
 
     ## Constraints
     # (54)
-    B = inst.rbound
+    C = inst.rbound
     @constraint(model,
-        MinMaxModel.pes_objective(pinst, pgraph, z, x, y) <= B)
+        MinMaxModel.minmax_objective(pinst, pgraph, z, x, y) <= C)
 
     # (35)-(37)
-    MinMaxModel.pes_constraints(pinst, model, pgraph, z, x)
+    MinMaxModel.minmax_constraints(pinst, model, pgraph, z, x)
 
     # (43)-(48)
     MinMinModel.minmin_constraints(inst, model, ograph, rho, flow, x)
@@ -77,7 +77,8 @@ function create_R_model(
 end
 
 """
-Optimize R model, and if not feasible solve the pessimistic model.
+Optimize R model, and if the R*-constrained model is not feasible solve
+Min-Max model.
 
 Arguments:
 * inst - LotSizingInstance
@@ -92,7 +93,7 @@ function optimizeRmodel!(inst, model, x, y)
         return model,x,y
     end
 
-    pmodel,px,py = MinMaxModel.create_pes_model(inst)
+    pmodel,px,py = MinMaxModel.create_minmax_model(inst)
 
     optimize!(pmodel)
 

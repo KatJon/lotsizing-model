@@ -16,6 +16,18 @@ import ..Model
 
 export create_hurwicz_model
 
+"""
+Create Hurwicz model for Lotsizing Problem.
+
+Arguments:
+* inst - LotSizingInstance,
+* alpha - parameter for Hurwicz criterion.
+
+Returns: tuple of
+* model - JuMP model,
+* x - vector of production quantity variables,
+* y - vector of setup variables.
+"""
 function create_hurwicz_model(
     inst::LotSizingInstance,
     alpha::Float64,
@@ -34,16 +46,16 @@ function create_hurwicz_model(
     ## Variables
     x,y = common_variables(inst, model)
     rho,flow = MinMinModel.minmin_variables(inst, model, ograph)
-    z = MinMaxModel.create_pes_variables(inst, model, pgraph)
+    z = MinMaxModel.minmax_variables(inst, model, pgraph)
 
     ## Objective
     @objective(model, Min,
-       alpha*MinMaxModel.pes_objective(inst, pgraph, z, x, y) +
+       alpha*MinMaxModel.minmax_objective(inst, pgraph, z, x, y) +
        (1-alpha)*MinMinModel.minmin_objective(inst, ograph, flow, y))
 
     ## Constraints
 
-    MinMaxModel.pes_constraints(inst, model, pgraph, z, x)
+    MinMaxModel.minmax_constraints(inst, model, pgraph, z, x)
 
     MinMinModel.minmin_constraints(inst, model, ograph, rho, flow, x)
 

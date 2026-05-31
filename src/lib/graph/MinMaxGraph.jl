@@ -49,10 +49,12 @@ end
 Base.show(io::IO, g::Graph) =
     print(io, "Nodes: ", g.nodes, "\nArcs: ", g.arcs)
 
+"Return all nodes of graph `g`."
 @memoize function eachnode(g::Graph)
     return eachindex(g.nodes)
 end
 
+"Return all arcs of graph `g`."
 @memoize function eacharc(g::Graph)
     return eachindex(g.arcs)
 end
@@ -113,6 +115,14 @@ end
     return terminating
 end
 
+"""
+Create MinMaxGraph according to section (?) (TODO: update).
+
+Arguments:
+* inst - LotSizingInstance.
+
+Returns: MinMaxGraph
+"""
 function create_minmax_graph(inst::LotSizingInstance):: Graph
     nodes = []
     arcs = []

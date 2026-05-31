@@ -15,10 +15,6 @@ export minmin_variables
 export minmin_constraints
 export minmin_objective
 
-get_opt_arrivals(inst::LotSizingInstance, rho) = [
-    findfirstvalue(j -> value(rho[t,j]) == 1, feasible_arrival_times(inst, t)) 
-        for t in prod_periods(inst)]
-
 """
 Create variables for Min-Min model
 
@@ -158,20 +154,20 @@ end #minmin_constraints
 Create Min-Min model based on equations (?)-(?) TODO: update
 
 Arguments:
-* inst - LotSizingInstance
+* inst - LotSizingInstance.
 
 Optional arguments:
-* make_optimizer - (default: create_highs) optimizer factory function
-* time_limit - (default: 300) time limit in seconds
+* make_optimizer - (default: create_highs) optimizer factory function,
+* time_limit - (default: 300) time limit in seconds.
 
 Returns: tuple of
-* model - JuMP model
-* x - vector of production quantity variables
-* y - vector of setup variables
-* rho - array of lead time realization variables
-* far_future_backordering - far future backordering quantity variable
-* flow - array of flow variables
-* graph - MinMinGraph
+* model - JuMP model,
+* x - vector of production quantity variables,
+* y - vector of setup variables,
+* rho - array of lead time realization variables,
+* far_future_backordering - far future backordering quantity variable,
+* flow - array of flow variables,
+* graph - MinMinGraph.
 """
 function create_minmin_model(
     inst::LotSizingInstance;
@@ -228,5 +224,9 @@ function opt_scenario_cost(
 
     return model
 end #opt_scenario_cost
+
+get_opt_arrivals(inst::LotSizingInstance, rho) = [
+    findfirstvalue(j -> value(rho[t,j]) == 1, feasible_arrival_times(inst, t)) 
+        for t in prod_periods(inst)]
 
 end #MinMinModel

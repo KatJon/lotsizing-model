@@ -3,7 +3,6 @@ module LotsizingModel
 
 # Order of includes is significant
 include("lib/Utils.jl")
-include("lib/StatUtils.jl")
 include("lib/Instance.jl")
 include("lib/Parse.jl")
 include("lib/graph/MinMinGraph.jl")
@@ -18,17 +17,25 @@ include("lib/model/SAA.jl")
 include("lib/model/Hurwicz.jl")
 include("lib/model/Deterministic.jl")
 include("lib/model/MipModel.jl")
-include("lib/gen/GenInstance.jl")
 
 export Utils, Instance, Parse
 export MinMinGraph, MinMaxGraph
 export Model
 export PseudoPoly
 export SAA
-export GenInstance
 
 import JuMP
 
+export load_instance
+
+"""
+Load an instance for lot-sizing problem from file under `path`.
+
+Arguments:
+* path - path to file.
+
+Returns: LotSizingInstance or nothing in case of validation error
+"""
 function load_instance(path::String)::Instance.LotSizingInstance
     open(path) do file
         instance = Parse.parse_instance(file)
@@ -57,9 +64,10 @@ function run_validation(instance::Instance.LotSizingInstance)
     return false
 end
 
+"Manual execution of Min-Max model with solution display."
 function run_minmax_model(instance::Instance.LotSizingInstance)
     println("Building min-max model")
-    @time model,x,y,z = Model.create_pes_model(instance)
+    @time model,x,y,z = Model.create_minmax_model(instance)
     
     JuMP.optimize!(model)
 
@@ -73,11 +81,12 @@ function run_minmax_model(instance::Instance.LotSizingInstance)
     end
 
     println("Optimal min-max objective: $(JuMP.objective_value(model))")
-end #run_pes_model
+end #run_minmax_model
 
+"Manual execution of Min-Min model with solution display."
 function run_minmin_model(instance::Instance.LotSizingInstance)
     println("Building min-min model")
-    @time model,x,_,rho,far_future_backordering = Model.create_minmin_model(instance)
+    @time model,x,_ = Model.create_minmin_model(instance)
 
     JuMP.optimize!(model)
 
@@ -90,14 +99,10 @@ function run_minmin_model(instance::Instance.LotSizingInstance)
         println("x[$(t)] => $(JuMP.value(x[t]))")
     end
 
-    println("Far future backordering: $(JuMP.value(far_future_backordering))")
-
     println("Min-min objective value: $(JuMP.objective_value(model))")
-
-    println("Min-min arrivals scenario:")
-    println(Model.get_opt_arrivals(instance, rho))
 end #run_opt_model
 
+"Manual execution of R* model with solution display."
 function run_R_model(instance::Instance.LotSizingInstance)
     println("Building R* model")
     if isnothing(instance.rbound)
@@ -118,12 +123,11 @@ function run_R_model(instance::Instance.LotSizingInstance)
     end
     
     println("Pessimistic objective:",
-        JuMP.value(Model.pes_objective(instance, pgraph, z,x,y)))
+        JuMP.value(Model.minmax_objective(instance, pgraph, z,x,y)))
     println("R* objective value: $(JuMP.objective_value(model))")
-    println("R* arrivals scenario:")
-    println(Model.get_opt_arrivals(instance, rho))
 end #run_R_model
 
+"Manually run Min-Max, Min-Min, and R* models for instance stored in file `instance_path`."
 function run_models(instance_path::String="../data/pesfig.dat")
     println("Parsing $(instance_path)")
     instance = load_instance(instance_path)
@@ -162,7 +166,7 @@ function __cold_start()
         Instance.Uncertainty.Model(Instance.Uncertainty.GammaD, 1),
         100,
     )
-    model1,_ = Model.create_pes_model(instance)
+    model1,_ = Model.create_minmax_model(instance)
     JuMP.optimize!(model1)
     model2,_ = Model.create_minmin_model(instance)
     JuMP.optimize!(model2)

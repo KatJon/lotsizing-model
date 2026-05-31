@@ -6,6 +6,19 @@ using ..Instance
 
 using JuMP
 
+export create_deterministic
+
+"""
+Create deterministic model for Lotsizing Problem.
+
+Arguments:
+* inst - LotSizingInstance.
+
+Returns: tuple of
+* model - JuMP model,
+* x - vector of production quantity variables,
+* y - vector of setup variables.
+"""
 function create_deterministic(
     inst::LotSizingInstance,
     ;

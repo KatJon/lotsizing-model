@@ -135,7 +135,7 @@ function mip_minmin_model(inst::LotSizingInstance)
     @objective(model, Min, mip_minmin_objective(inst, x, y, B, I))
 
     return model,x,y
-end #opt_model
+end #mip_minmin_model
 
 function opt_scenario_cost(
     inst::LotSizingInstance,
@@ -180,7 +180,7 @@ function prod_lead_cost_var(inst, model, x, y, zi, zb, arrival)
     return production + setup + inventory + backordering
 end #prod_lead_cost_var
 
-function pes_variables(
+function mip_minmax_variables(
     inst::LotSizingInstance,
     model::Model,
     NS::Int,
@@ -193,9 +193,9 @@ function pes_variables(
     @variable(model, zb[1:NS,tfut] >= 0)
 
     return zmax,z,zi,zb
-end #pes_variables
+end #mip_minmax_variables
 
-function pes_model(inst::LotSizingInstance)
+function mip_minmax_model(inst::LotSizingInstance)
     model = JuMP.Model(create_highs)
 
     tprod,tfut = time_periods(inst)
@@ -207,7 +207,7 @@ function pes_model(inst::LotSizingInstance)
     scenarios = Instance.list_scenarios(inst)
     NS = length(scenarios)
 
-    zmax,z,zi,zb = pes_variables(inst, model, NS)
+    zmax,z,zi,zb = mip_minmax_variables(inst, model, NS)
 
     for (i,scen) in enumerate(scenarios)
         @constraint(model,
@@ -238,7 +238,7 @@ function pes_scenario_cost(
     scenarios = Instance.list_scenarios(inst)
     NS = length(scenarios)
 
-    zmax,z,zi,zb = pes_variables(inst, model, NS)
+    zmax,z,zi,zb = mip_minmax_variables(inst, model, NS)
 
     for (i,scen) in enumerate(scenarios)
         @constraint(model,
@@ -252,7 +252,7 @@ function pes_scenario_cost(
     return model
 end
 
-function R_model(
+function mip_R_model(
     inst::LotSizingInstance,
     ;
     make_optimizer = Utils.create_highs,
@@ -279,7 +279,7 @@ function R_model(
     scenarios = Instance.list_scenarios(inst)
     NS = length(scenarios)
 
-    zmax,z,zi,zb = pes_variables(inst, model, NS)
+    zmax,z,zi,zb = mip_minmax_variables(inst, model, NS)
 
     for (i,scen) in enumerate(scenarios)
         @constraint(model,
