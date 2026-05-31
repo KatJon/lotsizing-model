@@ -1,13 +1,15 @@
-__precompile__(true)
 module ExperimentUtils
 
-import ..StatUtils
-import ..OptModel
-import ..PesModel
-using ..Instance
+import LotsizingModel as LM
+
+import .LM.StatUtils
+import .LM.OptModel
+import .LM.PesModel
+using .LM.Instance
 
 import Plots as plt
 import JuMP
+import Gurobi
 import Statistics
 import StatsBase
 
@@ -18,29 +20,39 @@ using Random
 using Printf
 
 export with_interval,
-    with_gamma1, with_gamma2,
+    with_gammaD, with_gammaC,
     with_rbound
 export case_experiment
 export plot_histograms
 export make_cost_plot
 export get_cost_bounds
 export stats_table_row
+export create_gurobi
+
+"Create a silent gurobi optimizer"
+function create_gurobi()
+    env = Gurobi.Env(Dict{String,Any}(
+        "OutputFlag" => 0
+    ))
+
+    return Gurobi.Optimizer(env)
+end #create_gurobi
 
 "Create new instance from `inst` with unlimited budget"
 function with_interval(inst::LotSizingInstance)
     return @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
 end
 
-"Create new instance from `inst` with Gamma1 budget set to `gamma`"
-function with_gamma1(inst::LotSizingInstance, gamma)
-    budget = Uncertainty.Model(Uncertainty.Gamma1, gamma)
+"Create new instance from `inst` with GammaD budget set to `gamma`"
+function with_gammaD(inst::LotSizingInstance, gamma)
+    budget = Uncertainty.Model(Uncertainty.GammaD, gamma)
     
     return @set inst.uncertainty=budget
 end
 
-"Create new instance from `inst` with Gamma2 budget set to `gamma`"
-function with_gamma2(inst::LotSizingInstance, gamma)
-    budget = Uncertainty.Model(Uncertainty.Gamma2, gamma)
+"Create new instance from `inst` with GammaC budget set to `gamma`"
+function with_gammaC(inst::LotSizingInstance, gamma)
+    budget = Uncertainty.Model(Uncertainty.GammaC, gamma)
     
     return @set inst.uncertainty=budget
 end
@@ -57,7 +69,7 @@ Arguments:
 * save_results - function that takes index of case, model, values of x, and values of y
 * inst - LotSizingInstance
 * cases - vector of cases to consider
-* update_inst - function to create instance with case_param (e.g. `with_gamma1`)
+* update_inst - function to create instance with case_param (e.g. `with_gammaD`)
 * create_model - function creating model, vector of x variables, and vector of y variables
 
 Optional arguments:
@@ -72,11 +84,12 @@ function case_experiment(
     create_model,
     ;
     after_solve=nothing,
-    optimize=nothing
+    optimize=nothing,
+    make_optimizer=LM.Utils.create_highs,
 )
     @showprogress for (i,case_param) in enumerate(cases)
         inst1 = update_inst(inst, case_param)
-        model,x,y, = create_model(inst1)
+        model,x,y, = create_model(inst1; make_optimizer=make_optimizer)
 
         if !isnothing(optimize)
             model,x,y = optimize(inst1,model,x,y)

@@ -9,9 +9,16 @@ Arguments:
 * T - number of production periods
 * Tplus - number of all periods (production + future)
 
+Keyword arguments:
+* seed - (default: nothing) seed for RNG engine
+
 Returns: LotSizingInstance
 """
-function single_instance(T::Int, Tplus::Int)
+function single_instance(
+    T::Int, Tplus::Int
+    ;
+    seed=nothing
+)
     MAX_DEMAND = 750
     CAPACITY = cld((Tplus-T)*MAX_DEMAND, T)
 
@@ -37,7 +44,9 @@ function single_instance(T::Int, Tplus::Int)
         Tplus,
         params,
         lt_params,
-        far_future_cost = 10^6
+        far_future_cost = 10^6,
+        ;
+        seed=seed
     )
 end
 

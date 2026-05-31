@@ -29,13 +29,23 @@ git clone git@github.com:KatJon/lotsizing-model.git
 
 ## Installing the dependencies
 
+To install dependencies in the development directory of the package the following commands can be used:
+
 ```
 julia --project=.
 ] activate .
 instantiate
 ```
 
-## Run the model
+## Adding package to environement
+
+To add the package to be used in the other project the following command can be used:
+
+```
+] add "git@github.com:KatJon/lotsizing-model"
+```
+
+## Run the package
 
 We provide a simple script `src/run.jl`, which loads the `LotsizingModel` package (imported as `LM`) provided in this repository and loads a simple instance. The environment can be ran interactively using command:
 
@@ -50,6 +60,19 @@ The experiments used to produce computational results presented in the article a
 ```
 julia -i --project=. src/experiment/RExperiment.jl
 julia> run()
+```
+
+Additionally, experiments for other files can be executed using function `experiment`, which takes a short name of the instance for sake of naming the output files and path to the instance. The experiments can be further customized using keyword arguments (see documentation in `src/experiment/RExperiment.jl`).
+
+By default, an open source solver HiGHS is used. If you wish to use Gurobi (e.g. to fully replicate the experiments conducted in the article), pass an optimizer factory as keyword argument `make_optimizer`. To suppress the Gurobi set the `OutputFlag` to `0`, as in function:
+```julia
+function create_gurobi()
+    env = Gurobi.Env(Dict{String,Any}(
+        "OutputFlag" => 0
+    ))
+
+    return Gurobi.Optimizer(env)
+end
 ```
 
 ## License

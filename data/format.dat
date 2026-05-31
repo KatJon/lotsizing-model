@@ -23,12 +23,12 @@ cI_{T+1} cI_{T+2} ... cI_{T^+}
 ## backordering_cost: vector[double]
 cB_{T+1} cB_{T+2} ... cB_{T^+}
 # uncertainty modelling
-# UNC_TYPE ::= NONE | INTERVAL | GAMMA1 Gamma | Gamma2 Gamma
+# UNC_TYPE ::= NONE | INTERVAL | GAMMAD Gamma | GammaC Gamma
 # e.g.
 # NONE
 # INTERVAL
-# GAMMA1 3
-# GAMMA2 4
+# GAMMAD 3
+# GAMMAC 4
 UNC_TYPE GAMMA?
 # R* BOUND
 # RBOUND := NONE | R* bound

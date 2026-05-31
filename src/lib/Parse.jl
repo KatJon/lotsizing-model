@@ -34,7 +34,7 @@ function assert_array_length(
     end
 end #assert_array_length
 
-UNCERTAINTY_TYPES = ["NONE", "INTERVAL", "GAMMA1", "GAMMA2"]
+UNCERTAINTY_TYPES = ["NONE", "INTERVAL", "GAMMAD", "GAMMAC"]
 
 function parse_uncertainty(
     line::String;
@@ -66,12 +66,12 @@ function parse_uncertainty(
 
     gamma = parse(Int, data[2])
 
-    if type == "GAMMA1"
-        return Uncertainty.Model(Uncertainty.Gamma1, gamma)
+    if type == "GAMMAD"
+        return Uncertainty.Model(Uncertainty.GammaD, gamma)
     end
 
-    if type == "GAMMA2"
-        return Uncertainty.Model(Uncertainty.Gamma2, gamma)
+    if type == "GAMMAC"
+        return Uncertainty.Model(Uncertainty.GammaC, gamma)
     end
 
     # Should be unreachable

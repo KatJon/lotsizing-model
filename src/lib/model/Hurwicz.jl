@@ -2,13 +2,12 @@ __precompile__(true)
 module Hurwicz
 
 using Memoization
-using JuMP, Gurobi
+using JuMP
 using ..Utils
 using ..Instance
 
-import ..OptGraph as OptG
-
-import ..PesGraph as PesG
+import ..MinMinGraph as OptG
+import ..MinMaxGraph as PesG
 
 using ..CommonModel
 import ..OptModel
@@ -21,16 +20,16 @@ function create_hurwicz_model(
     inst::LotSizingInstance,
     alpha::Float64,
     ;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
 
     M = sum(inst.production_capacity[t] for t in prod_periods(inst))
 
-    ograph = OptG.create_opt_graph(inst)
-    pgraph = PesG.create_pes_graph(inst)
+    ograph = OptG.create_minmin_graph(inst)
+    pgraph = PesG.create_minmax_graph(inst)
 
     ## Variables
     x,y = create_common_variables(inst, model)

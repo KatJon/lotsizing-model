@@ -1,10 +1,11 @@
 __precompile__(true)
 module Utils
 
-import Gurobi
+import HiGHS
+import MathOptInterface as MOI
 
 export skip_first, skip_last
-export create_gurobi
+export create_highs
 export findfirstvalue
 
 "Return view of subarray first element."
@@ -21,14 +22,18 @@ print_enum_array(as::AbstractArray) = "[" *
     join(["$(i)=>$(v)" for (i,v) in enumerate(as)], ",") * 
 "]"
 
-"Create a silent gurobi optimizer"
-function create_gurobi()
-    env = Gurobi.Env(Dict{String,Any}(
-        "OutputFlag" => 0
-    ))
+"Create a silent highs optimizer"
+function create_highs()
+    optimizer = HiGHS.Optimizer()
 
-    return Gurobi.Optimizer(env)
-end #create_gurobi
+    # Silence all possible HiGHS output
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("output_flag"), false)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("log_to_console"), false)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("log_dev_level"), 0)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("mip_report_level"), 0)
+
+    return optimizer
+end #create_highs
 
 """
 Find first value in `itr` satisfying predicate `pred`.

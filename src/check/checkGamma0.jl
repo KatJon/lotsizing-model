@@ -20,32 +20,32 @@ end
 function checkGamma0(inst::LotSizingInstance)
     det_cost = get_cost(Deterministic.create_deterministic(inst))
 
-    g1inst = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma1, 0)
-    g2inst = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Gamma2, 0)
+    gDinst = @set inst.uncertainty=Uncertainty.Model(Uncertainty.GammaD, 0)
+    gCinst = @set inst.uncertainty=Uncertainty.Model(Uncertainty.GammaC, 0)
 
-    optg1_cost = get_cost(LM.Model.create_opt_model(g1inst))
-    optg2_cost = get_cost(LM.Model.create_opt_model(g2inst))
+    optgD_cost = get_cost(LM.Model.create_opt_model(gDinst))
+    optgC_cost = get_cost(LM.Model.create_opt_model(gCinst))
 
-    pesg1_cost = get_cost(LM.Model.create_pes_model(g1inst))
-    pesg2_cost = get_cost(LM.Model.create_pes_model(g2inst))
+    pesgD_cost = get_cost(LM.Model.create_pes_model(gDinst))
+    pesgC_cost = get_cost(LM.Model.create_pes_model(gCinst))
 
-    rg1inst = @set g1inst.rbound=pesg1_cost
-    rg2inst = @set g2inst.rbound=pesg2_cost
-    Rg1_cost = get_cost(LM.Model.create_R_model(rg1inst))
-    Rg2_cost = get_cost(LM.Model.create_R_model(rg2inst))
+    rgDinst = @set gDinst.rbound=pesgD_cost
+    rgCinst = @set gCinst.rbound=pesgC_cost
+    RgD_cost = get_cost(LM.Model.create_R_model(rgDinst))
+    RgC_cost = get_cost(LM.Model.create_R_model(rgCinst))
     
     println("Deterministic:")
     println("$(det_cost)")
 
     println("Optimistic:")
-    println("Gamma1: $(optg1_cost)")
-    println("Gamma2: $(optg2_cost)")
+    println("GammaD: $(optgD_cost)")
+    println("GammaC: $(optgC_cost)")
 
     println("Pesimistic:")
-    println("Gamma1: $(pesg1_cost)")
-    println("Gamma2: $(pesg2_cost)")
+    println("GammaD: $(pesgD_cost)")
+    println("GammaC: $(pesgC_cost)")
 
     println("R*:")
-    println("Gamma1: $(Rg1_cost)")
-    println("Gamma2: $(Rg2_cost)")
+    println("GammaD: $(RgD_cost)")
+    println("GammaC: $(RgC_cost)")
 end

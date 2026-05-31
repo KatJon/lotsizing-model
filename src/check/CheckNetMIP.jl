@@ -81,7 +81,7 @@ end
 
 function run(path="data/simpl.dat")
     inst = LM.load_instance(path)
-    inst = with_gamma1(inst, 2)
+    inst = with_gammaD(inst, 2)
 
     println("# Optimistic")
     moptnet,xoptnet,yoptnet = Model.create_opt_model(inst)

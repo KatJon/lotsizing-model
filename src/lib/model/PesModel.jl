@@ -4,11 +4,11 @@ module PesModel
 using ..Utils
 using ..Instance
 
-import ..PesGraph as PesG
+import ..MinMaxGraph as PesG
 
 using ..CommonModel
 
-using JuMP, Gurobi
+using JuMP
 
 export create_pes_model
 
@@ -63,13 +63,13 @@ end #pes_constraints
 
 function create_pes_model(
     inst::LotSizingInstance;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
     
-    graph = PesG.create_pes_graph(inst)
+    graph = PesG.create_minmax_graph(inst)
 
     ## Variables
     x,y = create_common_variables(inst, model)
@@ -95,15 +95,15 @@ function pes_scenario_cost(
     inst::LotSizingInstance,
     xs::Vector{Float64},
     ;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
     
     ys = [x > 0 ? 1.0 : 0.0 for x in xs]
 
-    graph = PesG.create_pes_graph(inst)
+    graph = PesG.create_minmax_graph(inst)
 
     ## Variables
     z = create_pes_variables(inst, model, graph)

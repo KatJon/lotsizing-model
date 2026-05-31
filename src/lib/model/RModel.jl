@@ -3,16 +3,15 @@ module RModel
 using ..Utils
 using ..Instance
 
-import ..OptGraph as OptG
-
-import ..PesGraph as PesG
+import ..MinMinGraph as OptG
+import ..MinMaxGraph as PesG
 
 using ..CommonModel
 using ..OptModel
 using ..PesModel
 
 using Accessors: @set
-using JuMP, Gurobi
+using JuMP
 
 """
 Create R* model for the instance.
@@ -21,13 +20,13 @@ Arguments:
 * inst - LotSizingInstance
 
 Optional arguments:
-* make_optimizer - (default: create_gurobi) optimizer factory
+* make_optimizer - (default: create_highs) optimizer factory
 * time_limit - (default: 5*60 s) time limit in seconds
 * override_R_uncertainty - override uncertainty for the R* bound 
 """
 function create_R_model(
     inst::LotSizingInstance;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
     override_R_uncertainty = nothing
 )
@@ -36,7 +35,7 @@ function create_R_model(
     end
 
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
     
     if isnothing(override_R_uncertainty)
         pinst = inst
@@ -44,8 +43,8 @@ function create_R_model(
         pinst = @set inst.uncertainty=override_R_uncertainty
     end
 
-    ograph = OptG.create_opt_graph(inst)
-    pgraph = PesG.create_pes_graph(pinst)
+    ograph = OptG.create_minmin_graph(inst)
+    pgraph = PesG.create_minmax_graph(pinst)
 
     ## Variables
     x,y = create_common_variables(inst, model)

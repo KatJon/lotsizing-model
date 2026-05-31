@@ -14,7 +14,7 @@ export LotSizingInstance,
     Uncertainty,
     sample_arrivals,
     prod_lead_cost,
-    max_gamma2_budget
+    max_gammaC_budget
 
 """
 Provides type definitions for uncertainty modelling
@@ -24,15 +24,15 @@ module Uncertainty
     Enumeration type describing uncertainty set:
     - `None`: no uncertainty -- deterministic scenario
     - `Interval`: interval uncertainty -- all possible lead-time deviations are allowed.
-    - `Gamma1`: interval uncertainty with budget constraint on the number of deviations
-    - `Gamma2`: interval uncertainty with budget constraint on the sum of deviations
+    - `GammaD`: interval uncertainty with budget constraint on the number of deviations
+    - `GammaC`: interval uncertainty with budget constraint on the sum of deviations
     """
-    @enum Type None Interval Gamma1 Gamma2
+    @enum Type None Interval GammaD GammaC
 
     """
     Structure holding description of the uncertainty set.
     - `type`: uncertainty type.
-    - `gamma`: for budgeted uncertainty types (Gamma1, Gamma2) provides the budget ``\\Gamma``, for other types it should be `nothing`.
+    - `gamma`: for budgeted uncertainty types (GammaD, GammaC) provides the budget ``\\Gamma``, for other types it should be `nothing`.
     """
     struct Model
         type :: Type
@@ -44,10 +44,10 @@ module Uncertainty
             return "NONE"
         elseif unc.type == Interval
             return "INTERVAL"
-        elseif unc.type == Gamma1
-            return "GAMMA1 $(unc.gamma)"
-        elseif unc.type == Gamma2
-            return "GAMMA2 $(unc.gamma)"
+        elseif unc.type == GammaD
+            return "GAMMAD $(unc.gamma)"
+        elseif unc.type == GammaC
+            return "GAMMAC $(unc.gamma)"
         else
             throw("Unhandled uncertainty type $(unc.type)")
         end
@@ -347,30 +347,30 @@ function prod_lead_cost(inst::LotSizingInstance, x, y, arrival)
     return production + setup + inventory + backordering
 end #prod_lead_cost
 
-function validate_gamma1(arr, common_lead, gamma)
+function validate_gammaD(arr, common_lead, gamma)
     usage = sum(
         (p+common_lead != t) ? 1 : 0
             for (p,t) in enumerate(arr); init=0)
 
     return usage <= gamma
-end #validate_gamma1
+end #validate_gammaD
 
-function validate_gamma2(arr, common_lead, gamma)
+function validate_gammaC(arr, common_lead, gamma)
     usage = sum(
         abs(t - (p+common_lead))
             for (p,t) in enumerate(arr); init=0)
 
     return usage <= gamma
-end #validate_gamma2
+end #validate_gammaC
 
 function valid_budget_usage(inst::LotSizingInstance, arr)
     (;type) = inst.uncertainty
     if type == Uncertainty.Interval
         return true
-    elseif type == Uncertainty.Gamma1
-        return validate_gamma1(arr, inst.common_lead_time, inst.uncertainty.gamma)
-    elseif type == Uncertainty.Gamma2
-        return validate_gamma2(arr, inst.common_lead_time, inst.uncertainty.gamma)
+    elseif type == Uncertainty.GammaD
+        return validate_gammaD(arr, inst.common_lead_time, inst.uncertainty.gamma)
+    elseif type == Uncertainty.GammaC
+        return validate_gammaC(arr, inst.common_lead_time, inst.uncertainty.gamma)
     end
 
     throw("compute_budget_usage: Unhandled uncertainty type: $(type)")
@@ -425,9 +425,9 @@ function sample_arrivals(
 end #sample_arrivals
 
 """
-Compute maximal possible Gamma2 budget usage in an instance.
+Compute maximal possible GammaC budget usage in an instance.
 """
-@memoize function max_gamma2_budget(inst::LotSizingInstance)
+@memoize function max_gammaC_budget(inst::LotSizingInstance)
     return sum(max(inst.early_deviation[t], inst.late_deviation[t])
         for t in 1:inst.T)
 end

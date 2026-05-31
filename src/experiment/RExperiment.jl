@@ -6,7 +6,9 @@ import .LM.PesModel
 import .LM.OptModel
 import .LM.Deterministic
 using .LM.Instance
-using .LM.ExperimentUtils
+
+include("ExperimentUtils.jl")
+using .ExperimentUtils
 
 import Plots as plt
 using Plots.PlotMeasures
@@ -17,16 +19,22 @@ using Printf
 using ProgressMeter
 using StatsBase
 
-function opt_value(inst::LotSizingInstance)
-    model, = LM.Model.create_opt_model(inst)
+function opt_value(
+    inst::LotSizingInstance;
+    make_optimizer=LM.Utils.create_highs
+)
+    model, = LM.Model.create_opt_model(inst; make_optimizer=make_optimizer)
 
     optimize!(model)
 
     return objective_value(model)
 end
 
-function pes_value(inst::LotSizingInstance)
-    model, = LM.Model.create_pes_model(inst)
+function pes_value(
+    inst::LotSizingInstance;
+    make_optimizer=LM.Utils.create_highs
+)
+    model, = LM.Model.create_pes_model(inst;make_optimizer=make_optimizer)
 
     optimize!(model)
 
@@ -36,28 +44,30 @@ end
 
 function combined_hist_RG1(
     inst::LotSizingInstance,
+    samples,
     ;
-    N=100,
     name=nothing,
     gammas=nothing,
     scale=nothing,
     scalefmt=nothing,
+    make_optimizer=LM.Utils.create_highs
 )
     if isnothing(scale) != isnothing(scalefmt)
         throw("Both scale and scalefmt need to be provided")
     end
 
     if isnothing(gammas)
-        gammas = [2,4,6,10]
+        gammas = 1:inst.T
     end
 
     inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
-    pes_bound = pes_value(inst_interval)
+    pes_bound = pes_value(inst_interval; make_optimizer)
 
     NBOUNDS = 5
     rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
     rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
-    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+
+    N = length(samples)
 
     all_plots = []
     ymax = 0
@@ -65,8 +75,9 @@ function combined_hist_RG1(
     pes_costs = []
     pes_stats = []
     case_experiment(inst, gammas,
-        with_gamma1,
-        LM.Model.create_pes_model
+        with_gammaD,
+        LM.Model.create_pes_model,
+        make_optimizer=create_gurobi,
     ) do _,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
         stats = ExperimentUtils.experiment_stats(costs)
@@ -83,9 +94,10 @@ function combined_hist_RG1(
         row_costs = []
         row_stats = []
         case_experiment(inst1, gammas,
-            with_gamma1,
+            with_gammaD,
             LM.Model.create_R_model;
-            optimize=RModel.optimizeRmodel!
+            optimize=RModel.optimizeRmodel!,
+            make_optimizer=create_gurobi,
         ) do _,_,xs,ys
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
             stats = ExperimentUtils.experiment_stats(costs)
@@ -102,8 +114,9 @@ function combined_hist_RG1(
     opt_costs = []
     opt_stats = []
     case_experiment(inst, gammas,
-        with_gamma1,
-        LM.Model.create_opt_model
+        with_gammaD,
+        LM.Model.create_opt_model,
+        make_optimizer=create_gurobi,
     ) do _,_,xs,ys
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
         stats = ExperimentUtils.experiment_stats(costs)
@@ -129,7 +142,7 @@ function combined_hist_RG1(
     table_rows = []
 
     # Det problem for stats
-    det_model,x,y = Deterministic.create_deterministic(inst)
+    det_model,x,y = Deterministic.create_deterministic(inst; make_optimizer=make_optimizer)
     JuMP.optimize!(det_model)
     xs = collect(JuMP.value.(x))
     ys = collect(JuMP.value.(y))
@@ -288,109 +301,27 @@ function combined_hist_RG1(
     end
 end #combined_hist_RG1
 
-function pareto_front(
-    inst::LotSizingInstance,
+function pareto_plot(
+    plot, points,
     ;
-    name=nothing,
-    scale=nothing,
-    scalefmt=nothing,
+    label,
+    marker_z,
+    markershape,
 )
-    if isnothing(scale) != isnothing(scalefmt)
-        throw("Both scale and scalefmt need to be provided")
-    end
-    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
-    pes_bound = pes_value(inst_interval)
-
-    gammas = 0:inst.T
-    NBOUNDS = 3
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
-    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
-
-    plot = plt.Plot()
-    all_points = []
-
-    points = []
-    case_experiment(inst, gammas,
-        with_gamma1,
-        PesModel.create_pes_model
-    ) do _,_,xs,_
-        res = ExperimentUtils.get_cost_bounds(inst, collect(xs))
-
-        if !isnothing(scale)
-            res = res ./ scale
-        end
-
-        push!(points, res)
-    end
-    append!(all_points, points)
-
     xs,ys = collect.(zip(points...))
     plt.plot!(plot, xs, ys, seriestype=:scatter,
-        marker_z=gammas,
-        markershape=:diamond,
+        marker_z=marker_z,
+        markershape=markershape,
         markersize=8,
         markerstrokewidth=1,
-        label="Min-Max",
+        label=label,
         color=:Spectral,
     )
+end
 
-    points = []
-    case_experiment(inst, gammas,
-        with_gamma1,
-        OptModel.create_opt_model
-    ) do _,_,xs,_
-        res = ExperimentUtils.get_cost_bounds(inst, collect(xs))
-
-        if !isnothing(scale)
-            res = res ./ scale
-        end
-
-        push!(points, res)
-    end
-    append!(all_points, points)
-
-    xs,ys = collect.(zip(points...))
-    plt.plot!(plot, xs, ys, seriestype=:scatter,
-        marker_z=gammas,
-        markershape=:square,
-        markersize=8,
-        markerstrokewidth=1,
-        label="Min-Min",
-        color=:Spectral,
-    )
-
-    RMARKERS = [:circle, :hexagon, :star4, :utriangle]
-
-    for (i,rbound) in enumerate(rbounds)
-        inst1 = with_rbound(inst, rbound)
-
-        points = []
-        case_experiment(inst1, gammas,
-            with_gamma1,
-            RModel.create_R_model,
-            optimize=RModel.optimizeRmodel!,
-        ) do _,_,xs,_
-            res = ExperimentUtils.get_cost_bounds(inst, collect(xs))
-
-            if !isnothing(scale)
-                res = res ./ scale
-            end
-
-            push!(points, res)
-        end
-        append!(all_points, points)
-
-        xs,ys = collect.(zip(points...))
-        plt.plot!(plot, xs, ys, seriestype=:scatter,
-            label="R*\$($(rstring[i]))\$",
-            marker_z=gammas,
-            markershape=RMARKERS[i],
-            markersize=8,
-            markerstrokewidth=1,
-            color=:Spectral,
-        )
-    end
-
+function plot_front(
+    plot, all_points;
+)
     front = ExperimentUtils.pareto_front(all_points)
     xs,ys = collect.(zip(front...))
     plt.plot!(plot, xs, ys,
@@ -399,55 +330,250 @@ function pareto_front(
         color=:black,
         z_order=:back,
     )
+end
 
-    ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)") 
-    plt.ylabel!(plot, ylabel)
-    xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
-    plt.xlabel!(plot, xlabel)
-    plt.plot!(plot,
-        size=(1000,750),
-        left_margin=5mm,
-        legend_font_pointsize=12,
-        tickfontsize=12,
-        guidefontsize=14,
-        colorbar_title="\$\\Gamma^d\$",
-        colorbar_titlefontsize=14,
-    )
+function pareto_front(
+    inst::LotSizingInstance,
+    samples,
+    ;
+    name=nothing,
+    scale=nothing,
+    scalefmt=nothing,
+    make_optimizer=LM.Utils.create_highs,
+)
+    if isnothing(scale) != isnothing(scalefmt)
+        throw("Both scale and scalefmt need to be provided")
+    end
+    inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
+    pes_bound = pes_value(inst_interval; make_optimizer=make_optimizer)
+
+    gammas = 0:inst.T
+    NBOUNDS = 3
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
+  
+    all_min_max = []
+    all_med_quant = []
+    all_mean_stdev = []
+
+    min_max_points = []
+    med_quant_points = []
+    mean_stddev_points = []
+    case_experiment(inst, gammas,
+        with_gammaD,
+        PesModel.create_pes_model,
+        make_optimizer=make_optimizer,
+    ) do _,_,xs,ys
+        costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+        stats = ExperimentUtils.experiment_stats(costs)
+
+        min_max = (stats.min, stats.max)
+        med_quant = (stats.median, stats.perc90)
+        mean_stddev = (stats.mean, stats.stddev)
+
+        if !isnothing(scale)
+            min_max = min_max ./ scale
+            med_quant = med_quant ./ scale
+            mean_stddev = mean_stddev ./ scale
+        end
+
+        push!(min_max_points, min_max)
+        push!(med_quant_points, med_quant)
+        push!(mean_stddev_points, mean_stddev)
+    end
+    append!(all_min_max, min_max_points)
+    append!(all_med_quant, med_quant_points)
+    append!(all_mean_stdev, mean_stddev_points)
+    
+    minmaxplot = plt.Plot()
+    medquantplot = plt.Plot()
+    meanstddevplot = plt.Plot()
+
+    batch = [
+        (minmaxplot, min_max_points),
+        (medquantplot, med_quant_points),
+        (meanstddevplot, mean_stddev_points),
+    ]
+    for (plot, points) in batch
+        pareto_plot(plot, points;
+            label="Min-Max",
+            markershape=:diamond,
+            marker_z=gammas,
+        )
+    end
+
+    min_max_points = []
+    med_quant_points = []
+    mean_stddev_points = []
+    case_experiment(inst, gammas,
+        with_gammaD,
+        OptModel.create_opt_model,
+        make_optimizer=make_optimizer,
+    ) do _,_,xs,ys
+        costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+        stats = ExperimentUtils.experiment_stats(costs)
+
+        min_max = (stats.min, stats.max)
+        med_quant = (stats.median, stats.perc90)
+        mean_stddev = (stats.mean, stats.stddev)
+
+        if !isnothing(scale)
+            min_max = min_max ./ scale
+            med_quant = med_quant ./ scale
+            mean_stddev = mean_stddev ./ scale
+        end
+
+        push!(min_max_points, min_max)
+        push!(med_quant_points, med_quant)
+        push!(mean_stddev_points, mean_stddev)
+    end
+    append!(all_min_max, min_max_points)
+    append!(all_med_quant, med_quant_points)
+    append!(all_mean_stdev, mean_stddev_points)
+
+    batch = [
+        (minmaxplot, min_max_points),
+        (medquantplot, med_quant_points),
+        (meanstddevplot, mean_stddev_points),
+    ]
+    for (plot, points) in batch
+        pareto_plot(plot, points;
+            label="Min-Min",
+            markershape=:square,
+            marker_z=gammas,
+        )
+    end
+
+    RMARKERS = [:circle, :hexagon, :star4, :utriangle]
+
+    for (i,rbound) in enumerate(rbounds)
+        inst1 = with_rbound(inst, rbound)
+
+        min_max_points = []
+        med_quant_points = []
+        mean_stddev_points = []
+        case_experiment(inst1, gammas,
+            with_gammaD,
+            RModel.create_R_model,
+            optimize=RModel.optimizeRmodel!,
+            make_optimizer=make_optimizer,
+        ) do _,_,xs,ys
+            costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+            stats = ExperimentUtils.experiment_stats(costs)
+
+            min_max = (stats.min, stats.max)
+            med_quant = (stats.median, stats.perc90)
+            mean_stddev = (stats.mean, stats.stddev)
+
+            if !isnothing(scale)
+                min_max = min_max ./ scale
+                med_quant = med_quant ./ scale
+                mean_stddev = mean_stddev ./ scale
+            end
+
+            push!(min_max_points, min_max)
+            push!(med_quant_points, med_quant)
+            push!(mean_stddev_points, mean_stddev)
+        end
+        append!(all_min_max, min_max_points)
+        append!(all_med_quant, med_quant_points)
+        append!(all_mean_stdev, mean_stddev_points)
+
+
+        batch = [
+            (minmaxplot, min_max_points),
+            (medquantplot, med_quant_points),
+            (meanstddevplot, mean_stddev_points),
+        ]
+        for (plot, points) in batch
+            pareto_plot(plot, points;
+                label="R*\$($(rstring[i]))\$",
+                markershape=RMARKERS[i],
+                marker_z=gammas,
+            )
+        end
+    end
+
+    batch = [
+        (minmaxplot, all_min_max),
+        (medquantplot, all_med_quant),
+        (meanstddevplot, all_mean_stdev),
+    ]
+    for (plot, all_points) in batch
+        plot_front(plot, all_points)
+    end
+
+    batch = [
+        (minmaxplot, "Minimal cost", "Maximal cost"),
+        (medquantplot, "Median cost", "0.9-quantile"),
+        (meanstddevplot, "Mean cost", "Standard deviation"),
+    ]
+
+    for (plot, xname, yname) in batch
+        xlabel = xname * (isnothing(scale) ? "" : " $(scalefmt)")
+        plt.xlabel!(plot, xlabel)
+        ylabel = yname * (isnothing(scale) ? "" : " $(scalefmt)") 
+        plt.ylabel!(plot, ylabel)
+        plt.plot!(plot,
+            size=(1000,750),
+            left_margin=5mm,
+            legend_font_pointsize=12,
+            tickfontsize=12,
+            guidefontsize=14,
+            colorbar_title="\$\\Gamma^d\$",
+            colorbar_titlefontsize=14,
+        )
+    end
 
     if isnothing(name)
         println("Can't show multiple plots interactively.")
     else
-        plt.savefig(plot, "results/$(name)_RG1_pareto.pdf")
+        plt.savefig(minmaxplot, "results/$(name)_min-max_pareto.pdf")
+        plt.savefig(medquantplot, "results/$(name)_med-quant_pareto.pdf")
+        plt.savefig(meanstddevplot, "results/$(name)_mean-stddev_pareto.pdf")
     end
 end
 
-function experiments(name,path; skip_long=false, histgammas=nothing)
+function experiments(name,path;
+    histgammas=nothing,
+    make_optimizer=LM.Utils.create_highs,
+)
     println("# Experiment \"$(name)\"")
     inst = LM.load_instance(path)
 
     N = 10000
+    println("### Preparing sample arrivals")
+    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
-    if !skip_long
     println("### Combined hist G1")
-        combined_hist_RG1(inst, name=name, N=N,
+        combined_hist_RG1(inst, samples,
+            name=name,
             gammas=histgammas,
             scale=1e5,
-            scalefmt="\$\\cdot 10^5\$")
-    end
+            scalefmt="\$\\cdot 10^5\$",
+            make_optimizer=make_optimizer,
+        )
 
-    # println("### Pareto front")
-    #     pareto_front(inst, name=name,
-    #         scale=1e5,
-    #         scalefmt="\$\\cdot 10^5\$")
+    println("### Pareto front")
+        pareto_front(inst, samples,
+            name=name,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+            make_optimizer=make_optimizer,
+        )
     
     println("Done.")
 end
 
-function run()
+function run(;make_optimizer=LM.Utils.create_highs)
     mkpath("results")
 
-    experiments("10_21_1", "data/gen/10_21_1.dat")
+    experiments("10_21_1", "data/gen/10_21_1.dat",
+        make_optimizer=make_optimizer,
+        histgammas=[2,4,6,10],
+    )
     experiments("15_31_1", "data/gen/15_31_1.dat",
+        make_optimizer=make_optimizer,
         histgammas=[2,5,8,10,13],
     )
 end #run

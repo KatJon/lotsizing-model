@@ -1,8 +1,8 @@
 __precompile__(true)
-module OptGraph
+module MinMinGraph
 
 export
-    create_opt_graph,
+    create_minmin_graph,
     eachnode, eacharc,
     isnode, iunode, ivnode
 
@@ -94,7 +94,7 @@ end
 Node order:
 S,u_1,...,u_T,v_T+1,...,V_T+
 """
-function create_opt_graph(inst::LotSizingInstance)
+function create_minmin_graph(inst::LotSizingInstance)
     (; T, Tplus) = inst
     nodes = []
     arcs = []
@@ -159,6 +159,6 @@ function create_opt_graph(inst::LotSizingInstance)
             sum(inst.demand)))
 
     return Graph(nodes, arcs, unodes, vnodes)
-end
+end #create_minmin_graph
 
-end # module
+end #MinMinGraph

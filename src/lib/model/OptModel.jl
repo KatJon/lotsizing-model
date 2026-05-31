@@ -4,13 +4,13 @@ module OptModel
 using ..Instance
 using ..Utils
 
-import ..OptGraph as OptG
+import ..MinMinGraph as OptG
 
 using ..CommonModel
 
 using ..OptModel
 
-using JuMP, Gurobi
+using JuMP
 
 export create_opt_model
 
@@ -51,8 +51,8 @@ function opt_constraints(inst, model, graph, rho, flow, x)
         rho[t,j] + rho[t+1, k] <= 1
     )
 
-    # (45) Gamma 1
-    if inst.uncertainty.type == Uncertainty.Gamma1
+    # (45) Gamma^d
+    if inst.uncertainty.type == Uncertainty.GammaD
         @constraint(model,
             inst.uncertainty.gamma >= sum(rho[t,j] for
                 t in prod_periods(inst),
@@ -60,8 +60,8 @@ function opt_constraints(inst, model, graph, rho, flow, x)
                 if j != t + inst.common_lead_time
             ) 
         )
-    # (45) Gamma 2
-    elseif inst.uncertainty.type == Uncertainty.Gamma2
+    # (45) Gamma^c
+    elseif inst.uncertainty.type == Uncertainty.GammaC
         @constraint(model,
             inst.uncertainty.gamma >= sum(
                 abs(j - t - inst.common_lead_time) * rho[t,j] for
@@ -112,13 +112,13 @@ end #opt_constraints
 
 function create_opt_model(
     inst::LotSizingInstance;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
 
-    graph = OptG.create_opt_graph(inst)
+    graph = OptG.create_minmin_graph(inst)
 
     ## Variables
     x,y = create_common_variables(inst, model)
@@ -144,15 +144,15 @@ function opt_scenario_cost(
     inst::LotSizingInstance,
     xs::Vector{Float64},
     ;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
 
     ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
 
-    graph = OptG.create_opt_graph(inst)
+    graph = OptG.create_minmin_graph(inst)
     
     ## Variables
     rho,flow = create_opt_variables(inst, model, graph)

@@ -1,0 +1,27 @@
+# time periods
+10 21
+# production periods
+## setup cost
+1304.0 4751.0 4445.0 1651.0 1946.0 2959.0 4802.0 2906.0 1913.0 2870.0
+## production cost
+12.0 37.0 35.0 24.0 19.0 28.0 19.0 33.0 20.0 47.0
+## production capacity
+1030.0 1175.0 1010.0 917.0 913.0 1199.0 1234.0 1101.0 972.0 1048.0
+# lead time
+## common lead time
+10
+## late deviation
+3 3 3 3 3 3 3 3 2 1
+## early deviation
+0 1 1 1 1 1 1 1 1 1
+# future periods
+## demand
+174.0 120.0 623.0 621.0 182.0 589.0 296.0 591.0 285.0 291.0 494.0
+## inventory cost
+7.0 9.0 9.0 10.0 9.0 10.0 9.0 6.0 7.0 7.0 5.0
+## backordering cost
+96.0 73.0 69.0 62.0 99.0 84.0 55.0 85.0 62.0 76.0 1.0e6
+# uncertainty
+INTERVAL
+# R* bound
+NONE

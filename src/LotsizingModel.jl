@@ -6,8 +6,8 @@ include("lib/Utils.jl")
 include("lib/StatUtils.jl")
 include("lib/Instance.jl")
 include("lib/Parse.jl")
-include("lib/graph/OptGraph.jl")
-include("lib/graph/PesGraph.jl")
+include("lib/graph/MinMinGraph.jl")
+include("lib/graph/MinMaxGraph.jl")
 include("lib/model/CommonModel.jl")
 include("lib/model/OptModel.jl")
 include("lib/model/PesModel.jl")
@@ -19,10 +19,9 @@ include("lib/model/Hurwicz.jl")
 include("lib/model/Deterministic.jl")
 include("lib/model/MipModel.jl")
 include("lib/gen/GenInstance.jl")
-include("lib/ExperimentUtils.jl")
 
 export Utils, Instance, Parse
-export OptGraph, PesGraph
+export MinMinGraph, MinMaxGraph
 export Model
 export PseudoPoly
 export SAA
@@ -58,8 +57,8 @@ function run_validation(instance::Instance.LotSizingInstance)
     return false
 end
 
-function run_pes_model(instance::Instance.LotSizingInstance;compute_optobj=false)
-    println("Building pes model")
+function run_minmax_model(instance::Instance.LotSizingInstance)
+    println("Building min-max model")
     @time model,x,y,z = Model.create_pes_model(instance)
     
     JuMP.optimize!(model)
@@ -73,11 +72,11 @@ function run_pes_model(instance::Instance.LotSizingInstance;compute_optobj=false
         println("x[$(t)] => $(JuMP.value(x[t]))")
     end
 
-    println("Optimal pessimistic objective: $(JuMP.objective_value(model))")
+    println("Optimal min-max objective: $(JuMP.objective_value(model))")
 end #run_pes_model
 
-function run_opt_model(instance::Instance.LotSizingInstance; compute_pesobj=false)
-    println("Building opt model")
+function run_minmin_model(instance::Instance.LotSizingInstance)
+    println("Building min-min model")
     @time model,x,_,rho,far_future_backordering = Model.create_opt_model(instance)
 
     JuMP.optimize!(model)
@@ -93,9 +92,9 @@ function run_opt_model(instance::Instance.LotSizingInstance; compute_pesobj=fals
 
     println("Far future backordering: $(JuMP.value(far_future_backordering))")
 
-    println("Optimistic objective value: $(JuMP.objective_value(model))")
+    println("Min-min objective value: $(JuMP.objective_value(model))")
 
-    println("Optimistic arrivals scenario:")
+    println("Min-min arrivals scenario:")
     println(Model.get_opt_arrivals(instance, rho))
 end #run_opt_model
 
@@ -132,11 +131,11 @@ function run_models(instance_path::String="../data/pesfig.dat")
         println("Instance didn't pass validation")
     end
 
-    run_pes_model(instance, compute_optobj=true)
+    run_minmax_model(instance)
 
     println("\n===\n")
 
-    run_opt_model(instance, compute_pesobj=true)
+    run_minmin_model(instance)
 
     println("\n===\n")
 
@@ -160,7 +159,7 @@ function __cold_start()
         [0],
         [0],
         # uncertainty
-        Instance.Uncertainty.Model(Instance.Uncertainty.Gamma1, 1),
+        Instance.Uncertainty.Model(Instance.Uncertainty.GammaD, 1),
         100,
     )
     model1,_ = Model.create_pes_model(instance)

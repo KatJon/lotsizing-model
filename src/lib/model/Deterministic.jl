@@ -9,11 +9,11 @@ using JuMP
 function create_deterministic(
     inst::LotSizingInstance,
     ;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
 
     (;T,Tplus) = inst
     tprod = 1:T

@@ -6,7 +6,7 @@ using ..Utils
 
 using ..CommonModel
 
-using JuMP, Gurobi
+using JuMP
 
 function time_periods(inst::LotSizingInstance)
     tprod = 1:inst.T
@@ -59,8 +59,8 @@ function opt_constraints(
     )
 
     # Uncertainty budget constraints
-    ## Gamma1
-    if inst.uncertainty.type == Uncertainty.Gamma1
+    ## GammaD
+    if inst.uncertainty.type == Uncertainty.GammaD
         @constraint(model, 
             inst.uncertainty.gamma >= sum(rho[tp,tf-T] for
                 tp in tprod,
@@ -70,8 +70,8 @@ function opt_constraints(
         )
     end
 
-    ## Gamma2
-    if inst.uncertainty.type == Uncertainty.Gamma2
+    ## GammaC
+    if inst.uncertainty.type == Uncertainty.GammaC
         @constraint(model,
             inst.uncertainty.gamma >= sum(
                 abs(tf - tp - inst.common_lead_time) * rho[tp,tf] for
@@ -119,7 +119,7 @@ Arguments:
 * inst - LotSizingInstance
 """
 function opt_model(inst::LotSizingInstance)
-    model = JuMP.Model(create_gurobi)
+    model = JuMP.Model(create_highs)
 
     tprod,tfut = time_periods(inst)
 
@@ -141,11 +141,12 @@ function opt_scenario_cost(
     inst::LotSizingInstance,
     xs::AbstractVector{Float64},
     ;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
+
 
     ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
 
@@ -196,7 +197,7 @@ function pes_variables(
 end #pes_variables
 
 function pes_model(inst::LotSizingInstance)
-    model = JuMP.Model(create_gurobi)
+    model = JuMP.Model(create_highs)
 
     tprod,tfut = time_periods(inst)
     
@@ -225,11 +226,11 @@ function pes_scenario_cost(
     inst::LotSizingInstance,
     xs::AbstractVector{Float64},
     ;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
 
     ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
 
@@ -252,12 +253,18 @@ function pes_scenario_cost(
     return model
 end
 
-function R_model(inst::LotSizingInstance)
+function R_model(
+    inst::LotSizingInstance,
+    ;
+    make_optimizer = Utils.create_highs,
+    time_limit = 5*60,
+)
     if isnothing(inst.rbound)
         throw("Instance doesn't provide R* bound")
     end
     
-    model = JuMP.Model(create_gurobi)
+    model = JuMP.Model(make_optimizer)
+    set_time_limit_sec(model, time_limit)
 
     tprod,tfut = time_periods(inst)
 

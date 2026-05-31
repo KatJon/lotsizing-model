@@ -5,7 +5,7 @@ import ..Utils
 using ..Instance
 
 import Random
-using JuMP, Gurobi
+using JuMP
 
 export
     received_orders,
@@ -41,7 +41,7 @@ Arguments:
 
 Optional arguments:
 * make_optimizer - factory function for creating the JuMP optimizer 
-    (default: create_gurobi (Gurobi with silenced output))
+    (default: create_highs (Gurobi with silenced output))
 * time_limit - time limit for solve in seconds (default: 5min (300s))
 
 Returns: tuple of
@@ -53,11 +53,11 @@ function create_SAA_model(
     inst::LotSizingInstance,
     arrivals::Vector{Vector{Int}},
     ;
-    make_optimizer = Utils.create_gurobi,
+    make_optimizer = Utils.create_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
-    set_attribute(model, "TimeLimit", time_limit)
+    set_time_limit_sec(model, time_limit)
 
     REPS = length(arrivals)
     scens = 1:REPS

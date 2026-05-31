@@ -1,8 +1,8 @@
 __precompile__(true)
-module PesGraph
+module MinMaxGraph
 
 export
-    create_pes_graph,
+    create_minmax_graph,
     eachnode, eacharc
 
 using ..Utils
@@ -57,14 +57,14 @@ end
     return eachindex(g.arcs)
 end
 
-# Gamma1 => number of deviating lead times
-function compute_gamma1_usage(t, common_lead_time, deliveries)
+# GammaD => number of deviating lead times
+function compute_gammaD_usage(t, common_lead_time, deliveries)
     return sum((t != common_lead_time + delivery) ? 1 : 0 
         for delivery in deliveries; init=0)
 end
 
-# Gamma2 => sum of deviations
-function compute_gamma2_usage(t, common_lead_time, deliveries)
+# GammaC => sum of deviations
+function compute_gammaC_usage(t, common_lead_time, deliveries)
     return sum(abs(t - (common_lead_time + delivery))
         for delivery in deliveries; init=0)
 end
@@ -80,10 +80,10 @@ function compute_budget_usage(
     (;type) = inst.uncertainty
     if type == Uncertainty.Interval
         return 0
-    elseif type == Uncertainty.Gamma1
-        return compute_gamma1_usage(t, inst.common_lead_time, deliveries)
-    elseif type == Uncertainty.Gamma2
-        return compute_gamma2_usage(t, inst.common_lead_time, deliveries)
+    elseif type == Uncertainty.GammaD
+        return compute_gammaD_usage(t, inst.common_lead_time, deliveries)
+    elseif type == Uncertainty.GammaC
+        return compute_gammaC_usage(t, inst.common_lead_time, deliveries)
     end
 
     throw("compute_budget_usage: Unhandled uncertainty type: $(type)")
@@ -110,14 +110,10 @@ end
         next += 1
     end
 
-    # for (node,term) in zip(nodes, terminating)
-    #     if !term println("unterm:", node) end
-    # end
-
     return terminating
 end
 
-function create_pes_graph(inst::LotSizingInstance):: Graph
+function create_minmax_graph(inst::LotSizingInstance):: Graph
     nodes = []
     arcs = []
     nodemap = Dict{Node,Int}()
@@ -174,7 +170,7 @@ function create_pes_graph(inst::LotSizingInstance):: Graph
 
     if t1 <= inst.Tplus
         println(t1)
-        throw("PesGraph: Terminal node unreachable")
+        throw("MinMaxGraph: Terminal node unreachable")
     end
 
     terminating = terminating_nodes(nodes, arcs, iTerm)
@@ -184,4 +180,4 @@ function create_pes_graph(inst::LotSizingInstance):: Graph
     return Graph(nodes, arcs1, nodemap, terminating, iTerm)
 end
 
-end # PesGraph
+end # MinMaxGraph
