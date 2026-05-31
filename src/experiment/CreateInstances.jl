@@ -51,6 +51,8 @@ function single_instance(
     )
 end
 
-function run()
-    
+function run(T, Tplus, path)
+    inst = single_instance(T, Tplus)
+
+    LM.Instance.save_instance(inst, path)
 end

@@ -17,7 +17,7 @@ Directory `data` contains description of the format of the instance file (`forma
 
 Directory `results` contains the computational results and figures presented in the article.
 
-Directory `src` contains validation checks (folder `check`), experiments (folder `experiment`), and library of implementations of the models (folder `lib`).
+Directory `src` contains validation checks (folder `check`), experiments and data generation procedures (folder `experiment`), and library of implementations of the models (folder `lib`).
 
 ## Obtaining the repository
 
@@ -45,7 +45,7 @@ To add the package to be used in the other project the following command can be 
 ] add "git@github.com:KatJon/lotsizing-model"
 ```
 
-## Run the package
+## Run the package locally
 
 We provide a simple script `src/run.jl`, which loads the `LotsizingModel` package (imported as `LM`) provided in this repository and loads a simple instance. The environment can be ran interactively using command:
 

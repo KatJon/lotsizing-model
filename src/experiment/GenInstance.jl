@@ -1,16 +1,18 @@
 __precompile__(true)
 module GenInstance
 
+import LotsizingModel as LM
+
+import .LM.Instance
+using .LM.Instance: Uncertainty
+
+using Random
+
 export
     InstanceParameters,
     LeadtimeParameters,
         UniformLeadTime,
     gen_uniform
-
-import ..Instance
-using ..Instance: Uncertainty
-
-using Random
 
 """
 Generate a single integer value sampled from range (from,to).
