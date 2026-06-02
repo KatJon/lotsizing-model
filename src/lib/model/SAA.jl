@@ -39,9 +39,9 @@ Arguments:
 * inst - LotSizingInstance
 * arrivals - vector of vectors of arrival times
 
-Optional arguments:
+Keyword arguments:
 * make_optimizer - factory function for creating the JuMP optimizer 
-    (default: create_highs (Gurobi with silenced output))
+    (default: default_optimizer)
 * time_limit - time limit for solve in seconds (default: 5min (300s))
 
 Returns: tuple of
@@ -53,7 +53,7 @@ function create_SAA_model(
     inst::LotSizingInstance,
     arrivals::Vector{Vector{Int}},
     ;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)

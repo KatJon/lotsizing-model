@@ -32,7 +32,7 @@ function create_hurwicz_model(
     inst::LotSizingInstance,
     alpha::Float64,
     ;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60
 )
     model = JuMP.Model(make_optimizer)

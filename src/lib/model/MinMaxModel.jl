@@ -108,7 +108,7 @@ Arguments:
 * inst - LotSizingInstance.
 
 Optional arguments:
-* make_optimizer - (default: create_highs) optimizer factory function,
+* make_optimizer - (default: default_optimizer) optimizer factory function,
 * time_limit - (default: 300) time limit in seconds.
 
 Returns: tuple of
@@ -120,7 +120,7 @@ Returns: tuple of
 """
 function create_minmax_model(
     inst::LotSizingInstance;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
@@ -152,7 +152,7 @@ function pes_scenario_cost(
     inst::LotSizingInstance,
     xs::Vector{Float64},
     ;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)

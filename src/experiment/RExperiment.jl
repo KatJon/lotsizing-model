@@ -20,7 +20,7 @@ using StatsBase
 
 function opt_value(
     inst::LotSizingInstance;
-    make_optimizer=LM.Utils.create_highs
+    make_optimizer=LM.Utils.default_optimizer
 )
     model, = LM.Model.create_minmin_model(inst; make_optimizer=make_optimizer)
 
@@ -31,7 +31,7 @@ end
 
 function pes_value(
     inst::LotSizingInstance;
-    make_optimizer=LM.Utils.create_highs
+    make_optimizer=LM.Utils.default_optimizer
 )
     model, = LM.Model.create_minmax_model(inst;make_optimizer=make_optimizer)
 
@@ -49,7 +49,7 @@ function combined_hist_RG1(
     gammas=nothing,
     scale=nothing,
     scalefmt=nothing,
-    make_optimizer=LM.Utils.create_highs
+    make_optimizer=LM.Utils.default_optimizer
 )
     if isnothing(scale) != isnothing(scalefmt)
         throw("Both scale and scalefmt need to be provided")
@@ -338,7 +338,7 @@ function pareto_front(
     name=nothing,
     scale=nothing,
     scalefmt=nothing,
-    make_optimizer=LM.Utils.create_highs,
+    make_optimizer=LM.Utils.default_optimizer,
 )
     if isnothing(scale) != isnothing(scalefmt)
         throw("Both scale and scalefmt need to be provided")
@@ -535,7 +535,7 @@ end
 
 function experiments(name,path;
     histgammas=nothing,
-    make_optimizer=LM.Utils.create_highs,
+    make_optimizer=LM.Utils.default_optimizer,
 )
     println("# Experiment \"$(name)\"")
     inst = LM.load_instance(path)
@@ -564,7 +564,7 @@ function experiments(name,path;
     println("Done.")
 end
 
-function run(;make_optimizer=LM.Utils.create_highs)
+function run(;make_optimizer=LM.Utils.default_optimizer)
     mkpath("results")
 
     experiments("10_21_1", "data/gen/10_21_1.dat",

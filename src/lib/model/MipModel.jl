@@ -119,7 +119,7 @@ Arguments:
 * inst - LotSizingInstance
 """
 function mip_minmin_model(inst::LotSizingInstance)
-    model = JuMP.Model(create_highs)
+    model = JuMP.Model(default_optimizer)
 
     tprod,tfut = time_periods(inst)
 
@@ -141,7 +141,7 @@ function opt_scenario_cost(
     inst::LotSizingInstance,
     xs::AbstractVector{Float64},
     ;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
@@ -196,7 +196,7 @@ function mip_minmax_variables(
 end #mip_minmax_variables
 
 function mip_minmax_model(inst::LotSizingInstance)
-    model = JuMP.Model(create_highs)
+    model = JuMP.Model(default_optimizer)
 
     tprod,tfut = time_periods(inst)
     
@@ -225,7 +225,7 @@ function pes_scenario_cost(
     inst::LotSizingInstance,
     xs::AbstractVector{Float64},
     ;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.credefault_optimizerate_highs,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)
@@ -255,7 +255,7 @@ end
 function mip_R_model(
     inst::LotSizingInstance,
     ;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
 )
     if isnothing(inst.rbound)

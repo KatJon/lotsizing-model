@@ -7,6 +7,7 @@ include("lib/Instance.jl")
 include("lib/Parse.jl")
 include("lib/graph/MinMinGraph.jl")
 include("lib/graph/MinMaxGraph.jl")
+include("lib/graph/PseudoPolyGraph.jl")
 include("lib/model/CommonModel.jl")
 include("lib/model/MinMinModel.jl")
 include("lib/model/MinMaxModel.jl")
@@ -19,7 +20,7 @@ include("lib/model/Deterministic.jl")
 include("lib/model/MipModel.jl")
 
 export Utils, Instance, Parse
-export MinMinGraph, MinMaxGraph
+export MinMinGraph, MinMaxGraph, PseudoPolyGraph
 export Model
 export PseudoPoly
 export SAA

@@ -6,6 +6,8 @@ import MathOptInterface as MOI
 
 export skip_first, skip_last
 export create_highs
+export default_optimizer
+export set_default_optimizer!
 export findfirstvalue
 
 "Return view of subarray first element."
@@ -34,6 +36,14 @@ function create_highs()
 
     return optimizer
 end #create_highs
+
+"Default optimizer for models"
+default_optimizer = create_highs
+
+"Set default optimizer"
+function set_default_optimizer!(optimizer)
+    default_optimizer = optimizer
+end
 
 """
 Find first value in `itr` satisfying predicate `pred`.

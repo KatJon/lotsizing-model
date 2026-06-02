@@ -82,9 +82,10 @@ function run(path="data/simpl.dat")
     budget = Instance.Uncertainty.Model(Instance.Uncertainty.GammaD, 2)
     inst = @set inst.uncertainty=budget
 
-    println("# Optimistic")
+    println("# MinMin")
     moptnet,xoptnet,yoptnet = Model.create_minmin_model(inst)
     moptmip,xoptmip,yoptmip = MipModel.mip_minmin_model(inst)
+
 
     compare_models(moptnet, moptmip)
 
@@ -97,7 +98,7 @@ function run(path="data/simpl.dat")
 
     #=================#
 
-    println("# Pessimistic")
+    println("# MinMax")
     mpesnet,xpesnet = Model.create_minmax_model(inst)
     mpesmip,xpesmip = MipModel.mip_minmax_model(inst)
 

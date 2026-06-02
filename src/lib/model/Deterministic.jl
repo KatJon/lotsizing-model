@@ -22,7 +22,7 @@ Returns: tuple of
 function create_deterministic(
     inst::LotSizingInstance,
     ;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
 )
     model = JuMP.Model(make_optimizer)

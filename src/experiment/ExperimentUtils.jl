@@ -140,7 +140,7 @@ function case_experiment(
     ;
     after_solve=nothing,
     optimize=nothing,
-    make_optimizer=LM.Utils.create_highs,
+    make_optimizer=LM.Utils.default_optimizer,
 )
     @showprogress for (i,case_param) in enumerate(cases)
         inst1 = update_inst(inst, case_param)

@@ -20,13 +20,13 @@ Arguments:
 * inst - LotSizingInstance
 
 Optional arguments:
-* make_optimizer - (default: create_highs) optimizer factory
+* make_optimizer - (default: default_optimizer) optimizer factory
 * time_limit - (default: 5*60 s) time limit in seconds
 * override_R_uncertainty - override uncertainty budget in the R* bound 
 """
 function create_R_model(
     inst::LotSizingInstance;
-    make_optimizer = Utils.create_highs,
+    make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
     override_R_uncertainty = nothing
 )
