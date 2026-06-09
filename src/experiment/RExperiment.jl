@@ -148,7 +148,7 @@ function combined_hist_RG1(
     det_costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
     det_stats = ExperimentUtils.experiment_stats(det_costs)
 
-    line = ExperimentUtils.stats_table_row(det_stats, "-", model="\$\\textsc{Det}\$\n")
+    line = ExperimentUtils.stats_table_row(det_stats, "-", model="\$\\textsc{Nominal}\$\n")
     push!(table_rows, line)
     push!(table_rows, "\\hline")
     push!(table_rows, "\\hline")

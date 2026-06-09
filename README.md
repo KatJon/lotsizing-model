@@ -17,7 +17,7 @@ Directory `data` contains description of the format of the instance file (`forma
 
 Directory `results` contains the computational results and figures presented in the article.
 
-Directory `src` contains validation checks (folder `check`), experiments and data generation procedures (folder `experiment`), and library of implementations of the models (folder `lib`).
+Directory `src` contains validation checks (folder `check`), experiments and data generation procedures (folder `experiment`), and main library files containing implementations of the models and algorithms (folder `lib`).
 
 ## Obtaining the repository
 
@@ -91,6 +91,10 @@ If you reference the article, use this code or dataset, please cite the manuscri
 ```
 [Citation will be updated after publication]
 ```
+
+## Acknowledgements
+
+Adam Kasperski, Szymon Wróbel and Paweł Zieliński were supported by the National Science Center, Poland, grant 2022/45/B/HS4/00355.
 
 ## Contact
 
