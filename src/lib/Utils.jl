@@ -42,7 +42,7 @@ default_optimizer = create_highs
 
 "Set default optimizer"
 function set_default_optimizer!(optimizer)
-    default_optimizer = optimizer
+    global default_optimizer = optimizer
 end
 
 """
