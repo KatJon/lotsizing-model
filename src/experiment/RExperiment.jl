@@ -541,10 +541,10 @@ function experiments(name,path;
     inst = LM.load_instance(path)
 
     N = 10000
-    println("### Preparing sample arrivals")
+    println("### Preparing sample lead times")
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
-    println("### Combined hist G1")
+    println("### Combined histogram G1")
         combined_hist_RG1(inst, samples,
             name=name,
             gammas=histgammas,
@@ -553,7 +553,7 @@ function experiments(name,path;
             make_optimizer=make_optimizer,
         )
 
-    println("### Pareto front")
+    println("### Preparing bicriterial plots with Pareto front")
         pareto_front(inst, samples,
             name=name,
             scale=1e5,
@@ -566,6 +566,8 @@ end
 
 function run(;make_optimizer=LM.Utils.default_optimizer)
     mkpath("results")
+
+    println("Results will be placed in the directory `results`")
 
     experiments("10_21_1", "data/gen/10_21_1.dat",
         make_optimizer=make_optimizer,
