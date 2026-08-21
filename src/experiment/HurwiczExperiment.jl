@@ -20,7 +20,13 @@ using ProgressMeter
 function bicriterial(name, inst;
     alphas=LinRange(0,1,30),
     gammas=nothing,
+    scale=nothing,
+    scalefmt=nothing,
 )
+    if isnothing(scale) != isnothing(scalefmt)
+        throw("Both scale and scalefmt need to be provided")
+    end
+
     if isnothing(gammas)
         gammas = collect(0:inst.T)
     end
@@ -45,9 +51,13 @@ function bicriterial(name, inst;
             xs = collect(JuMP.value.(x))
             ys = collect(JuMP.value.(y))
 
-            cmin,cmax = get_cost_bounds(inst_interval, xs)
-            mins[i] = cmin
-            maxs[i] = cmax
+            res = get_cost_bounds(inst_interval, xs)
+            
+            if !isnothing(scale)
+                res = res ./ scale
+            end
+
+            mins[i],maxs[i] = res
         end
 
         plt.plot!(plot, mins, maxs,
@@ -55,6 +65,10 @@ function bicriterial(name, inst;
             palette=plt_palette,
             markershape=:circle,
         )
+        xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
+        plt.xlabel!(plot, xlabel)
+        ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)") 
+        plt.ylabel!(plot, ylabel)
     end
 
     plt.savefig(plot, "results/$(name)_hur_min-max.pdf")
@@ -76,7 +90,13 @@ end
 function bicriterialR(name, inst;
     alphas=LinRange(1.0,1.5,30),
     gammas=nothing,
+    scale=nothing,
+    scalefmt=nothing,
 )
+    if isnothing(scale) != isnothing(scalefmt)
+        throw("Both scale and scalefmt need to be provided")
+    end
+
     if isnothing(gammas)
         gammas = collect(0:inst.T)
     end
@@ -103,9 +123,13 @@ function bicriterialR(name, inst;
             xs = collect(JuMP.value.(x))
             ys = collect(JuMP.value.(y))
 
-            cmin,cmax = get_cost_bounds(inst_interval, xs)
-            mins[i] = cmin
-            maxs[i] = cmax
+            res = get_cost_bounds(inst_interval, xs)
+
+            if !isnothing(scale)
+                res = res ./ scale
+            end
+
+            mins[i],maxs[i] = res
         end
 
         plt.plot!(plot, mins, maxs,
@@ -113,6 +137,10 @@ function bicriterialR(name, inst;
             palette=plt_palette,
             markershape=:circle,
         )
+        xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
+        plt.xlabel!(plot, xlabel)
+        ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)") 
+        plt.ylabel!(plot, ylabel)
     end
 
     plt.savefig(plot, "results/$(name)_hurR_min-max.pdf")
@@ -125,7 +153,7 @@ function combined_hist_hurwicz(
     ;
     name=nothing,
     gammas=nothing,
-    alphas=LinRange(0,1,6),
+    alphas=reverse(LinRange(0,1,6)),
     scale=nothing,
     scalefmt=nothing
 )
@@ -176,7 +204,7 @@ function combined_hist_hurwicz(
             gammas,
             hcosts[i];
             # only add gamma titles in first row (min-max)
-            mktitle=i>1 ? nothing : gamma -> "\$\\Gamma_1 = $(gamma)\$",
+            mktitle=i>1 ? nothing : gamma -> "\$\\Gamma^d = $(gamma)\$",
             rescale=true,
             perc90=true,
             hideyaxis=true,
@@ -185,6 +213,13 @@ function combined_hist_hurwicz(
         plt.ylabel!(plots[begin], "\\alpha=$(@sprintf "%.2f" alpha)")
         plt.plot!(plots[begin], left_margin = 25mm)
         ymax = max(ymax, maximum(plt.ylims(plot)[end] for plot in plots))
+
+        if i == length(alphas)
+            for plot in plots
+                plt.xlabel!(plot, "Cost $(scalefmt)")
+                plt.plot!(plot, bottom_margin = 20mm)
+            end
+        end
 
         append!(all_plots, plots)
     end
@@ -239,11 +274,17 @@ function experiment(name, path)
             scale=1e5,
             scalefmt="\$\\cdot 10^5\$",
         )
-
+    
     println("### Preparing bicriterial Hurwicz plots")
-        bicriterial(name, inst)
+        bicriterial(name, inst,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+        )
     println("### Preparing bicriterial R* plots")
-        bicriterialR(name, inst)
+        bicriterialR(name, inst,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+        )
 end
 
 function run(;make_optimizer=create_gurobi)
