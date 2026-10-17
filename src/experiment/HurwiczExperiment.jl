@@ -17,7 +17,71 @@ using Plots.PlotMeasures
 using Printf
 using ProgressMeter
 
-function bicriterial(name, inst;
+function bicriterialOptPes(name, inst;
+    alphas=LinRange(0,1,30),
+    gammas=nothing,
+    scale=nothing,
+    scalefmt=nothing,
+)
+    if isnothing(scale) != isnothing(scalefmt)
+        throw("Both scale and scalefmt need to be provided")
+    end
+
+    if isnothing(gammas)
+        gammas = collect(0:inst.T)
+    end
+
+    inst_interval = with_interval(inst)
+
+    plot = plt.Plot()
+    plt_palette = plt.palette(:rainbow, length(gammas))
+
+    tasks = [
+        (LM.Model.create_minmin_model, "Min-Min", :diamond),
+        (LM.Model.create_minmax_model, "Min-Max", :square)
+    ]
+
+    for (create_model, model_name, shape) in tasks
+        mins = [0.0 for _ in gammas]
+        maxs = [0.0 for _ in gammas]
+
+        for (i, gamma) in enumerate(gammas)
+            inst1 = with_gammaD(inst, gamma)
+
+            model,x,y = create_model(inst1)
+
+            optimize!(model)
+
+            xs = collect(JuMP.value.(x))
+            ys = collect(JuMP.value.(y))
+
+            res = get_cost_bounds(inst_interval, xs)
+
+            if !isnothing(scale)
+                res = res ./ scale
+            end
+
+            mins[i],maxs[i] = res
+        end
+
+        plt.plot!(plot, mins, maxs,
+            label=model_name,
+            seriestype=:scatter,
+            color=plt_palette,
+            marker_z=gammas,
+            markershape=shape,
+        )
+        xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
+        plt.xlabel!(plot, xlabel)
+        ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
+        plt.ylabel!(plot, ylabel)
+    end
+
+    plt.savefig(plot, "results/$(name)_opt-pes_min-max.pdf")
+    plt.savefig(plot, "results/$(name)_opt-pes_min-max.png")
+end
+
+function bicriterialHur(name, inst;
     alphas=LinRange(0,1,30),
     gammas=nothing,
     scale=nothing,
@@ -52,7 +116,7 @@ function bicriterial(name, inst;
             ys = collect(JuMP.value.(y))
 
             res = get_cost_bounds(inst_interval, xs)
-            
+
             if !isnothing(scale)
                 res = res ./ scale
             end
@@ -67,7 +131,7 @@ function bicriterial(name, inst;
         )
         xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
         plt.xlabel!(plot, xlabel)
-        ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)") 
+        ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
         plt.ylabel!(plot, ylabel)
     end
 
@@ -139,7 +203,7 @@ function bicriterialR(name, inst;
         )
         xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
         plt.xlabel!(plot, xlabel)
-        ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)") 
+        ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
         plt.ylabel!(plot, ylabel)
     end
 
@@ -234,7 +298,7 @@ function combined_hist_hurwicz(
             xguidefontsize=30,
             tickfontsize=26,
             ytick_direction=:in,
-            xformatter=(isnothing(scale) ? nothing : 
+            xformatter=(isnothing(scale) ? nothing :
                 x -> x / scale)
         )
     end
@@ -246,7 +310,7 @@ function combined_hist_hurwicz(
     allhist = plt.plot(
         all_plots...,
         ;
-        layout=layout, 
+        layout=layout,
         size=(3000,3000),
         plot_titlefontsize=24,
     )
@@ -263,6 +327,12 @@ function experiment(name, path)
     println("# Experiment \"$(name)\"")
     inst = LM.load_instance(path)
 
+    println("### Preparing bicriterial min-min and min-max")
+        bicriterialOptPes(name, inst,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+        )
+
     N = 10000
     println("### Preparing sample lead times")
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
@@ -274,12 +344,13 @@ function experiment(name, path)
             scale=1e5,
             scalefmt="\$\\cdot 10^5\$",
         )
-    
+
     println("### Preparing bicriterial Hurwicz plots")
-        bicriterial(name, inst,
+        bicriterialHur(name, inst,
             scale=1e5,
             scalefmt="\$\\cdot 10^5\$",
         )
+
     println("### Preparing bicriterial R* plots")
         bicriterialR(name, inst,
             scale=1e5,
