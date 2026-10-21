@@ -1,20 +1,30 @@
 __precompile__(true)
 module Instance
 
+using ..Utils
+
+using ProgressMeter
 using Memoization
 
 import Random
+using Base.Threads
 
-export LotSizingInstance,
-    prod_periods, future_periods,
-    lead_min, lead_max,
-    feasible_lead_times, feasible_arrival_times,
+export LotSizingInstance
+export Uncertainty
+export
     cumulative_demand,
-    may_arrive_by, must_arrive_by,
-    Uncertainty,
-    sample_arrivals,
+    feasible_arrival_times,
+    feasible_lead_times,
+    future_periods,
+    lead_max,
+    lead_min,
+    max_gammaC_budget,
+    may_arrive_by,
+    must_arrive_by,
     prod_lead_cost,
-    max_gammaC_budget
+    prod_periods,
+    sample_arrivals
+export instance_sampling_weights
 
 """
 Provides type definitions for uncertainty modelling
@@ -55,7 +65,7 @@ module Uncertainty
 end #Uncertainty
 
 """
-Structure `LotSizingInstance` holds the input data describing the instance of 
+Structure `LotSizingInstance` holds the input data describing the instance of
 (R*) Lot-sizing Problem with Lead Time Uncertainty.
 
 # Fields
@@ -123,7 +133,7 @@ function save_instance(
     write_array(f, a) = write(f, join(a, " ") * "\n")
     write_uncertainty(f, unc) = write(f, "$(Uncertainty.show(unc))\n")
     write_rbound(f, rbound) = write(f, isnothing(rbound) ? "NONE\n" : "R* $(rbound)\n")
-    
+
     open(path, "w") do file
         if !isnothing(name)
             write(file, "# Instance: $(name)\n")
@@ -145,7 +155,7 @@ function save_instance(
         write_array(file, inst.production_cost)
         write(file, "## production capacity\n")
         write_array(file, inst.production_capacity)
-        
+
         # lead time characterization
         write(file, "# lead time\n")
         write(file, "## common lead time\n")
@@ -154,7 +164,7 @@ function save_instance(
         write_array(file, inst.late_deviation)
         write(file, "## early deviation\n")
         write_array(file, inst.early_deviation)
-        
+
         # future periods
         write(file, "# future periods\n")
         write(file, "## demand\n")
@@ -191,7 +201,7 @@ end
     (;T,common_lead_time,late_deviation) = inst
 
     return [
-        common_lead_time + late_deviation[i] 
+        common_lead_time + late_deviation[i]
             for i in 1:T
     ]
 end #lead_max
@@ -201,7 +211,7 @@ end #lead_max
     (;T,common_lead_time,early_deviation) = inst
 
     return [
-        common_lead_time - early_deviation[i] 
+        common_lead_time - early_deviation[i]
             for i in 1:T
     ]
 end #lead_min
@@ -252,7 +262,7 @@ Compute vector of the numbers of deliveries that must arrive in future periods:
     (;Tplus) = inst
 
     return [
-        _must_arrive_by_t(inst, t) 
+        _must_arrive_by_t(inst, t)
             for t in 1:Tplus
     ]
 end
@@ -283,7 +293,7 @@ Compute vector of the numbers of deliveries that may arrive in future periods:
     (;Tplus) = inst
 
     return [
-        _may_arrive_by_t(inst, t) 
+        _may_arrive_by_t(inst, t)
             for t in 1:Tplus
     ]
 end
@@ -331,12 +341,12 @@ function prod_lead_cost(inst::LotSizingInstance, x, y, arrival)
     production = sum(inst.production_cost[t] * x[t] for t in prod_periods(inst))
     setup = sum(inst.setup_cost[t] * y[t] for t in prod_periods(inst))
 
-    X = [sum(x[p] for p in prod_periods(inst) if arrival[p] <= t; init=0) 
+    X = [sum(x[p] for p in prod_periods(inst) if arrival[p] <= t; init=0)
         for t in future_periods(inst)]
-    
+
     D = cumulative_demand(inst)
 
-    invt = [inst.inventory_cost[t-T]*max(0, X[t-T] - D[t-T]) 
+    invt = [inst.inventory_cost[t-T]*max(0, X[t-T] - D[t-T])
         for t in future_periods(inst)]
     inventory = sum(invt)
 
@@ -430,6 +440,106 @@ Compute maximal possible GammaC budget usage in an instance.
 @memoize function max_gammaC_budget(inst::LotSizingInstance)
     return sum(max(inst.early_deviation[t], inst.late_deviation[t])
         for t in 1:inst.T)
+end
+
+struct SamplingWeights
+    # weight of previous
+    weight::Int
+
+    # weights for next choice
+    # INV: weight = sum(n.weight for n in next) if length(prev) < inst.T
+    next_weights::Vector{SamplingWeights}
+end
+
+Base.show(io::IO, w::SamplingWeights) = print(io,
+    "($(w.weight), " *
+    "$(Utils.print_array(w.next_weights)))"
+)
+
+@memoize function get_next_choices(inst::LotSizingInstance)
+    choices = Vector{Int}[]
+    sizehint!(choices, inst.T)
+    for t in 1:inst.T
+        early = t + inst.common_lead_time - inst.early_deviation[t]
+        late = t + inst.common_lead_time + inst.late_deviation[t]
+
+        push!(choices, collect(early : late))
+    end
+
+    return choices
+end
+
+function get_max_budget(
+    inst::LotSizingInstance,
+    ignore_budget::Bool
+)
+    if ignore_budget
+        return 0
+    end
+
+    if inst.uncertainty.type in [Uncertainty.GammaD, Uncertainty.GammaC]
+        return inst.uncertainty.gamma
+    end
+
+    return 0
+end
+
+function compute_sampling_weights(
+    inst::LotSizingInstance,
+    state::Array{Union{Missing,SamplingWeights}},
+    choices::Vector{Vector{Int}},
+    t::Int,
+    prev::Union{Missing,Int}=missing,
+    usage::Int=1,
+)
+    next = @views choices[t]
+
+    weights = []
+    sizehint!(weights, length(next))
+
+    for t1 in next
+        if !ismissing(prev) && prev > t1
+            push!(weights, SamplingWeights(0, []))
+            continue
+        end
+
+        nextusage = usage
+
+        # TODO: support budget usage
+        lookup = state[t, t1-inst.T, nextusage]
+
+        if !ismissing(lookup)
+            push!(weights, lookup)
+            continue
+        end
+
+        t1weight = t == inst.T ?
+            SamplingWeights(1, []) :
+            compute_sampling_weights(inst, state, choices, t+1, t1, nextusage)
+        state[t, t1-inst.T, usage] = t1weight
+        push!(weights, t1weight)
+    end
+
+    weight = sum(w.weight for w in weights; init=0)
+
+    return SamplingWeights(weight, weights)
+end
+
+function get_sampling_weights(
+    inst::LotSizingInstance
+    ;
+    ignore_budget=false
+)
+    budget = get_max_budget(inst, ignore_budget)
+    choices = get_next_choices(inst)
+    # t,t1-T,1+usage
+    state = Array{Union{Missing,SamplingWeights}}(missing,
+        inst.T,
+        inst.Tplus - inst.T,
+        1 + budget,
+    )
+
+    return compute_sampling_weights(inst, state, choices, 1, missing, 1)
 end
 
 end #Instance

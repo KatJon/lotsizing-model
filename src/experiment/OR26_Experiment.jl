@@ -10,7 +10,7 @@ using .LM.Instance
 
 import Plots as plt
 
-using Accessors: @set,@reset
+using Accessors: @reset,@set
 using Base.Threads
 using JuMP
 using Plots.PlotMeasures
@@ -77,8 +77,8 @@ function bicriterialOptPes(name, inst;
         plt.ylabel!(plot, ylabel)
     end
 
-    plt.savefig(plot, "results/$(name)_opt-pes_min-max.pdf")
-    plt.savefig(plot, "results/$(name)_opt-pes_min-max.png")
+    plt.savefig(plot, "results/or26/$(name)_opt-pes_min-max.pdf")
+    plt.savefig(plot, "results/or26/$(name)_opt-pes_min-max.png")
 end
 
 function bicriterialHur(name, inst;
@@ -135,8 +135,8 @@ function bicriterialHur(name, inst;
         plt.ylabel!(plot, ylabel)
     end
 
-    plt.savefig(plot, "results/$(name)_hur_min-max.pdf")
-    plt.savefig(plot, "results/$(name)_hur_min-max.png")
+    plt.savefig(plot, "results/or26/$(name)_hur_min-max.pdf")
+    plt.savefig(plot, "results/or26/$(name)_hur_min-max.png")
 end
 
 
@@ -207,8 +207,8 @@ function bicriterialR(name, inst;
         plt.ylabel!(plot, ylabel)
     end
 
-    plt.savefig(plot, "results/$(name)_hurR_min-max.pdf")
-    plt.savefig(plot, "results/$(name)_hurR_min-max.png")
+    plt.savefig(plot, "results/or26/$(name)_hurR_min-max.pdf")
+    plt.savefig(plot, "results/or26/$(name)_hurR_min-max.png")
 end
 
 function combined_hist_hurwicz(
@@ -318,8 +318,8 @@ function combined_hist_hurwicz(
     if isnothing(name)
         println("Can't show multiple plots interactively.")
     else
-        plt.savefig(allhist, "results/$(name)_hur_combined_hist.pdf")
-        plt.savefig(allhist, "results/$(name)_hur_combined_hist.png")
+        plt.savefig(allhist, "results/or26/$(name)_hur_combined_hist.pdf")
+        plt.savefig(allhist, "results/or26/$(name)_hur_combined_hist.png")
     end
 end #combined_hist_hurwicz
 
@@ -363,7 +363,7 @@ function run(;make_optimizer=create_gurobi)
         LM.Utils.set_default_optimizer!(make_optimizer)
     end
 
-    mkpath("results")
+    mkpath("results/or26")
 
     println("Results will be placed in the directory `results`")
 

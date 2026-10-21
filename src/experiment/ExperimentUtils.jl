@@ -20,9 +20,11 @@ using Printf
 using Random
 using StatsBase
 
-export with_interval,
-    with_gammaD, with_gammaC,
-    with_rbound
+export with_interval
+export with_gammaD
+export with_gammaC
+export with_rbound
+
 export case_experiment
 export plot_histograms
 export make_cost_plot
@@ -101,14 +103,14 @@ end
 "Create new instance from `inst` with GammaD budget set to `gamma`"
 function with_gammaD(inst::LotSizingInstance, gamma)
     budget = Uncertainty.Model(Uncertainty.GammaD, gamma)
-    
+
     return @set inst.uncertainty=budget
 end
 
 "Create new instance from `inst` with GammaC budget set to `gamma`"
 function with_gammaC(inst::LotSizingInstance, gamma)
     budget = Uncertainty.Model(Uncertainty.GammaC, gamma)
-    
+
     return @set inst.uncertainty=budget
 end
 
@@ -186,8 +188,8 @@ Returns: vector of plots
 function plot_histograms(
     amin, amax, nbuckets, nsamples,
     cases,
-    all_data, 
-    ; 
+    all_data,
+    ;
     mktitle=nothing,
     rescale=false,
     perc90=false,
@@ -399,7 +401,7 @@ function pareto_front(observations)
             valy = point[2]
         end
     end
-    
+
     return front
 end
 

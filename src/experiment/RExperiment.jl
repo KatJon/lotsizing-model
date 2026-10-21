@@ -1,9 +1,10 @@
 import LotsizingModel as LM
 
-import .LM.RModel
+import .LM.Deterministic
+import .LM.Hurwicz
 import .LM.MinMaxModel
 import .LM.MinMinModel
-import .LM.Deterministic
+import .LM.RModel
 using .LM.Instance
 
 include("ExperimentUtils.jl")
@@ -11,7 +12,7 @@ using .ExperimentUtils
 
 import Plots as plt
 using Plots.PlotMeasures
-using Accessors: @set,@reset
+using Accessors: @reset,@set
 using DelimitedFiles
 using JuMP
 using Printf
@@ -197,7 +198,7 @@ function combined_hist_RG1(
 
     # Min-max plots
     pes_plots = plot_histograms(
-        xmin, xmax, k, N, 
+        xmin, xmax, k, N,
         gammas,
         pes_costs;
         mktitle=gamma -> "\$\\Gamma^d = $(gamma)\$",
@@ -276,7 +277,7 @@ function combined_hist_RG1(
             xguidefontsize=30,
             tickfontsize=26,
             ytick_direction=:in,
-            xformatter=(isnothing(scale) ? nothing : 
+            xformatter=(isnothing(scale) ? nothing :
                 x -> x / scale)
         )
     end
@@ -288,7 +289,7 @@ function combined_hist_RG1(
     allhist = plt.plot(
         all_plots...,
         ;
-        layout=layout, 
+        layout=layout,
         size=(3000,3000),
         plot_titlefontsize=24,
     )
@@ -299,6 +300,133 @@ function combined_hist_RG1(
         plt.savefig(allhist, "results/$(name)_RG1_combined_hist.pdf")
     end
 end #combined_hist_RG1
+
+function combined_hist_hurwicz(
+    inst::LotSizingInstance,
+    samples,
+    ;
+    name=nothing,
+    gammas=nothing,
+    alphas=reverse(LinRange(0,1,6)),
+    scale=nothing,
+    scalefmt=nothing,
+    make_optimizer=LM.Utils.default_optimizer,
+)
+    if isnothing(scale) != isnothing(scalefmt)
+        throw("Both scale and scalefmt need to be provided")
+    end
+
+    if isnothing(gammas)
+        gammas = 1:inst.T
+    end
+
+    N = length(samples)
+
+    table_rows = []
+    hcosts = []
+    for alpha in alphas
+        row_costs = []
+        case_experiment(inst, gammas,
+            with_gammaD,
+            (i;kw...) -> Hurwicz.create_hurwicz_model(i, alpha; make_optimizer),
+        ) do i,_,xs,ys
+            costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+
+            stats = ExperimentUtils.experiment_stats(costs)
+            line = ExperimentUtils.stats_table_row(stats, gammas[i],
+                model=i>1 ? nothing : "\$H($(@sprintf "%.2f" alpha))\$\n"
+            )
+
+            push!(table_rows, line)
+
+            push!(row_costs, costs)
+        end
+
+        push!(hcosts, row_costs)
+    end
+
+    table_path = "results/$(name)_hur_combined_stats.txt"
+    table_content = join(table_rows, "\n")
+    open(table_path, "w") do file
+        write(file, table_content)
+    end
+
+    xmin = minimum(
+        minimum(costs) for row in hcosts for costs in row
+    )
+
+    xmax = maximum(
+        maximum(costs) for row in hcosts for costs in row
+    )
+
+    ## Plots
+    all_plots = []
+    ymax = 0
+
+    # Sturges rule
+    k = 1 + 2*ceil(Int64, log2(N))
+
+    # Hurwicz plots
+    for (i,alpha) in enumerate(alphas)
+        plots = plot_histograms(
+            xmin, xmax, k, N,
+            gammas,
+            hcosts[i];
+            # only add gamma titles in first row
+            mktitle=i>1 ? nothing : gamma -> "\$\\Gamma^d = $(gamma)\$",
+            rescale=true,
+            perc90=true,
+            hideyaxis=true,
+        )
+
+        plt.ylabel!(plots[begin], "\\alpha=$(@sprintf "%.2f" alpha)")
+        plt.plot!(plots[begin], left_margin = 25mm)
+        ymax = max(ymax, maximum(plt.ylims(plot)[end] for plot in plots))
+
+        if i == length(alphas)
+            for plot in plots
+                plt.xlabel!(plot, "Cost $(scalefmt)")
+                plt.plot!(plot, bottom_margin = 20mm)
+            end
+        end
+
+        append!(all_plots, plots)
+    end
+
+    # Final processing
+    for plot in all_plots
+        plt.ylims!(plot, (0.0, ymax))
+        plt.xlims!(plot, (xmin, xmax))
+        plt.plot!(plot,
+            titlefontsize=30,
+            yguidefontsize=30,
+            xguidefontsize=30,
+            tickfontsize=26,
+            ytick_direction=:in,
+            xformatter=(isnothing(scale) ? nothing :
+                x -> x / scale)
+        )
+    end
+
+    layout= @plt.layout [
+        plt.grid(length(alphas), length(gammas))
+    ]
+
+    allhist = plt.plot(
+        all_plots...,
+        ;
+        layout=layout,
+        size=(3000,3000),
+        plot_titlefontsize=24,
+    )
+
+    if isnothing(name)
+        println("Can't show multiple plots interactively.")
+    else
+        plt.savefig(allhist, "results/$(name)_hur_combined_hist.pdf")
+        plt.savefig(allhist, "results/$(name)_hur_combined_hist.png")
+    end
+end #combined_hist_hurwicz
 
 function pareto_plot(
     plot, points,
@@ -350,7 +478,7 @@ function pareto_front(
     NBOUNDS = 3
     rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
     rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
-  
+
     all_min_max = []
     all_med_quant = []
     all_mean_stdev = []
@@ -383,7 +511,7 @@ function pareto_front(
     append!(all_min_max, min_max_points)
     append!(all_med_quant, med_quant_points)
     append!(all_mean_stdev, mean_stddev_points)
-    
+
     minmaxplot = plt.Plot()
     medquantplot = plt.Plot()
     meanstddevplot = plt.Plot()
@@ -511,7 +639,7 @@ function pareto_front(
     for (plot, xname, yname) in batch
         xlabel = xname * (isnothing(scale) ? "" : " $(scalefmt)")
         plt.xlabel!(plot, xlabel)
-        ylabel = yname * (isnothing(scale) ? "" : " $(scalefmt)") 
+        ylabel = yname * (isnothing(scale) ? "" : " $(scalefmt)")
         plt.ylabel!(plot, ylabel)
         plt.plot!(plot,
             size=(1000,750),
@@ -533,6 +661,119 @@ function pareto_front(
     end
 end
 
+function hurwicz_pareto(
+    inst::LotSizingInstance,
+    samples,
+    ;
+    name=nothing,
+    scale=nothing,
+    scalefmt=nothing,
+    make_optimizer=LM.Utils.default_optimizer,
+)
+    if isnothing(scale) != isnothing(scalefmt)
+        throw("Both scale and scalefmt need to be provided")
+    end
+
+    gammas = 0:inst.T
+    NBOUNDS = 5
+    alphas = LinRange(0, 1, NBOUNDS)
+    alphastr = [@sprintf "%.2f" alph for alph in alphas]
+
+    all_min_max = []
+    all_med_quant = []
+    all_mean_stdev = []
+
+    minmaxplot = plt.Plot()
+    medquantplot = plt.Plot()
+    meanstddevplot = plt.Plot()
+
+    HMARKERS = [:square, :circle, :hexagon, :star4, :utriangle, :diamond]
+
+    for (i,alpha) in enumerate(alphas)
+        min_max_points = []
+        med_quant_points = []
+        mean_stddev_points = []
+        case_experiment(inst, gammas,
+            with_gammaD,
+            (i;kw...)->Hurwicz.create_hurwicz_model(i, alpha),
+            make_optimizer=make_optimizer,
+        ) do _,_,xs,ys
+            costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
+            stats = ExperimentUtils.experiment_stats(costs)
+
+            min_max = (stats.min, stats.max)
+            med_quant = (stats.median, stats.perc90)
+            mean_stddev = (stats.mean, stats.stddev)
+
+            if !isnothing(scale)
+                min_max = min_max ./ scale
+                med_quant = med_quant ./ scale
+                mean_stddev = mean_stddev ./ scale
+            end
+
+            push!(min_max_points, min_max)
+            push!(med_quant_points, med_quant)
+            push!(mean_stddev_points, mean_stddev)
+        end
+        append!(all_min_max, min_max_points)
+        append!(all_med_quant, med_quant_points)
+        append!(all_mean_stdev, mean_stddev_points)
+
+
+        batch = [
+            (minmaxplot, min_max_points),
+            (medquantplot, med_quant_points),
+            (meanstddevplot, mean_stddev_points),
+        ]
+        for (plot, points) in batch
+            pareto_plot(plot, points;
+                label="H\$($(alphastr[i]))\$",
+                markershape=HMARKERS[i],
+                marker_z=gammas,
+            )
+        end
+    end
+
+    batch = [
+        (minmaxplot, all_min_max),
+        (medquantplot, all_med_quant),
+        (meanstddevplot, all_mean_stdev),
+    ]
+    for (plot, all_points) in batch
+        plot_front(plot, all_points)
+    end
+
+    batch = [
+        (minmaxplot, "Minimal cost", "Maximal cost"),
+        (medquantplot, "Median cost", "0.9-quantile"),
+        (meanstddevplot, "Mean cost", "Standard deviation"),
+    ]
+
+    for (plot, xname, yname) in batch
+        xlabel = xname * (isnothing(scale) ? "" : " $(scalefmt)")
+        plt.xlabel!(plot, xlabel)
+        ylabel = yname * (isnothing(scale) ? "" : " $(scalefmt)")
+        plt.ylabel!(plot, ylabel)
+        plt.plot!(plot,
+            size=(1000,750),
+            left_margin=5mm,
+            legend_font_pointsize=12,
+            tickfontsize=12,
+            guidefontsize=14,
+            colorbar_title="\$\\Gamma^d\$",
+            colorbar_titlefontsize=14,
+        )
+    end
+
+    if isnothing(name)
+        println("Can't show multiple plots interactively.")
+    else
+        plt.savefig(minmaxplot, "results/$(name)_hur_min-max_pareto.pdf")
+        plt.savefig(medquantplot, "results/$(name)_hur_med-quant_pareto.pdf")
+        plt.savefig(meanstddevplot, "results/$(name)_hur_mean-stddev_pareto.pdf")
+    end
+end #hurwicz_pareto
+
 function experiments(name,path;
     histgammas=nothing,
     make_optimizer=LM.Utils.default_optimizer,
@@ -544,7 +785,7 @@ function experiments(name,path;
     println("### Preparing sample lead times")
     samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
 
-    println("### Combined histogram G1")
+    println("### Combined histogram R* G1")
         combined_hist_RG1(inst, samples,
             name=name,
             gammas=histgammas,
@@ -553,14 +794,31 @@ function experiments(name,path;
             make_optimizer=make_optimizer,
         )
 
-    println("### Preparing bicriterial plots with Pareto front")
+    println("### Combined histogram Hurwicz")
+        combined_hist_hurwicz(inst, samples,
+            name=name,
+            gammas=histgammas,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+            make_optimizer=make_optimizer,
+        )
+
+    println("### Preparing bicriterial R* plots with Pareto front")
         pareto_front(inst, samples,
             name=name,
             scale=1e5,
             scalefmt="\$\\cdot 10^5\$",
             make_optimizer=make_optimizer,
         )
-    
+
+    println("### Preparing bicriterial Hurwicz plots with Pareto front")
+        hurwicz_pareto(inst, samples,
+            name=name,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+            make_optimizer=make_optimizer,
+        )
+
     println("Done.")
 end
 
