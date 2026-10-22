@@ -542,4 +542,45 @@ function get_sampling_weights(
     return compute_sampling_weights(inst, state, choices, 1, missing, 1)
 end
 
+function weighted_sampling(
+    inst::LotSizingInstance,
+    N::Int,
+    ;
+    ignore_budget=false,
+    seed=nothing,
+)
+    rng = Random.Xoshiro(seed)
+    choices = get_next_choices(inst)
+    weights = get_sampling_weights(inst; ignore_budget)
+
+    scenarios = [zeros(Int, inst.T) for _ in 1:N]
+
+    for i in 1:N
+        w = weights
+        r = Random.rand(rng, 1:w.weight)
+
+        for t in 1:inst.T
+            ch = choices[t]
+
+            for (j, t1) in enumerate(ch)
+                if r <= 0
+                    throw("Error during generation of scenario $(i) in period $(t): exhausted possible scenarios.")
+                end
+
+                w1 = w.next_weights[j]
+
+                if w1.weight > 0 && r <= w1.weight
+                    scenarios[i][t] = t1
+                    w = w1
+                    break
+                end
+
+                r -= w1.weight
+            end
+        end
+    end
+
+    return scenarios
+end #weighted_sampling
+
 end #Instance

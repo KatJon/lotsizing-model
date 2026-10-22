@@ -368,5 +368,5 @@ function run(;make_optimizer=create_gurobi)
     println("Results will be placed in the directory `results`")
 
     experiment("10_21_1", "data/gen/10_21_1.dat")
-    # experiment("15_31_1", "data/gen/15_31_1.dat")
+    experiment("15_31_1", "data/gen/15_31_1.dat")
 end

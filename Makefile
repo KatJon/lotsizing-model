@@ -3,7 +3,7 @@ all:
 
 .PHONY: fig
 fig:
-	zip fig.zip results/*
+	zip fig.zip results/* results/or26/*
 
 .PHONY: copyfigs
 copyfigs:

@@ -783,7 +783,8 @@ function experiments(name,path;
 
     N = 10000
     println("### Preparing sample lead times")
-    samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+    # samples = ExperimentUtils.rejection_sample_arrivals(inst, N)
+    samples = Instance.weighted_sampling(inst, N; ignore_budget=true)
 
     println("### Combined histogram R* G1")
         combined_hist_RG1(inst, samples,
