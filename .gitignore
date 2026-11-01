@@ -31,3 +31,5 @@ JuliaLocalPreferences.toml
 
 fig.zip
 
+# computation cache
+cache

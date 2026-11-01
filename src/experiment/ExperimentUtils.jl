@@ -33,6 +33,7 @@ export stats_table_row
 export create_gurobi
 export mkcutoffs, mkhist
 export with_file_cache
+export get_setups
 
 """
 Create cutoffs for `N` bins spread uniformly between `vmin` and `vmax`.
@@ -74,14 +75,16 @@ Optional arguments:
 
 Returns: array of values.
 """
-function with_file_cache(compute, filename; force=false, dlm=',', typ=Float64)
-    if !force && isfile(filename)
-        return readdlm(filename, dlm, typ)
+function with_file_cache(compute, filename; force=false, dlm=',', typ=Float64, cachedir="cache")
+    mkpath(cachedir)
+    path="$(cachedir)/$(filename)"
+    if !force && isfile(path)
+        return readdlm(path, dlm, typ)
     end
 
     A = compute()
 
-    writedlm(filename, A, dlm)
+    writedlm(path, A, dlm)
 
     return A
 end
@@ -354,12 +357,17 @@ end
 sprint_2f = x -> @sprintf "%.2f" x
 sprint_4f = x -> @sprintf "%.4f" x
 
+function format_nondom(str, nondominated)
+    return !nondominated ? str :
+        "\\textbf{$(str)}"
+end
+
 function save_stats(path, stats; index_name="index")
     open(path, "w") do file
         write(file, "$(index_name), min, max, mean, median, stddev, perc90\n")
 
         for row in stats
-            i,min,max,mean,median,stddev,perc90 = row
+            i,min,max,mean,median,stddev,perc90,nondominated = row
 
             line = join([
                 "$(i)",
@@ -405,4 +413,7 @@ function pareto_front(observations)
     return front
 end
 
+function get_setups(xs;eps=1e-7)
+    return [x <= eps ? 0 : 1 for x in xs]
+end
 end #ExperimentUtils
