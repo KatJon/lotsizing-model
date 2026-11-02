@@ -60,19 +60,184 @@ function result_summary(
     all_sol = [
         det_stats,
         pes_stats...,
-        vcat(r_stats...)...,
         opt_stats...,
+        vcat(r_stats...)...,
         vcat(hur_stats[begin+1:end-1]...)...,
     ]
 
     nondom_idx = ExperimentUtils.get_nondom_minmax_id(all_sol)
 
     table_rows = []
+    pareto_solutions = []
+    plot = plt.Plot()
 
     i = 1
-    line = ExperimentUtils.nondom_summary_row(det_stats, "-", nondom_idx[i];model="\$\\textsc{Nominal}\$\n")
 
-    i+=1
+    # Nominal solution
+    line = ExperimentUtils.nondom_summary_row(det_stats, "-", nondom_idx[i];
+        model="\$\\textsc{Nominal}\$\n")
+    push!(table_rows, line)
+    push!(table_rows, "\\hline")
+    push!(table_rows, "\\hline")
+
+    det_points = []
+    if nondom_idx[i]
+        point = (det_stats.min, det_stats.max)
+        push!(pareto_solutions, point)
+        push!(det_points, point)
+    end
+
+    pareto_plot(plot, det_points;
+        label="Nominal",
+        markershape=:circle,
+        marker_z=nothing,
+        color=:blue,
+    )
+
+    # MinMax
+    pes_points = []
+    for (j,stat) in enumerate(pes_stats)
+        line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
+            model=j>1 ? "" : "\$\\textsc{Min-Max}\$\n")
+        push!(table_rows, line)
+        push!(table_rows, "\\hline")
+        push!(table_rows, "\\hline")
+
+        if nondom_idx[i+j]
+            point = (stat.min, stat.max)
+            push!(pareto_solutions, point)
+            push!(pes_points, point)
+        end
+    end
+
+    pareto_plot(plot, pes_points;
+        label="Min-Max",
+        markershape=:diamond,
+        marker_z=nothing,
+        color=:yellow,
+    )
+
+    i += length(pes_stats)
+
+    # Min-Min
+    opt_points = []
+    for (j,stat) in enumerate(opt_stats)
+        line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
+            model=j>1 ? "" : "\$\\textsc{Min-Min}\$\n")
+        push!(table_rows, line)
+        push!(table_rows, "\\hline")
+        push!(table_rows, "\\hline")
+
+        if nondom_idx[i+j]
+            point = (stat.min, stat.max)
+            push!(pareto_solutions, point)
+            push!(opt_points, point)
+        end
+    end
+
+    pareto_plot(plot, opt_points;
+        label="Min-Min",
+        markershape=:square,
+        marker_z=nothing,
+        color=:red,
+    )
+
+    i += length(opt_stats)
+
+    # R*
+    r_points = []
+
+    for (ir, row_stats) in enumerate(r_stats)
+        for (j,stat) in enumerate(row_stats)
+            line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
+                model=j>1 ? "" : "\$R^*($(rstring[ir]))\$\n")
+            push!(table_rows, line)
+            push!(table_rows, "\\hline")
+            push!(table_rows, "\\hline")
+
+            if nondom_idx[i+j]
+                point = (stat.min, stat.max)
+                push!(pareto_solutions, point)
+                push!(r_points, point)
+            end
+        end
+
+        i += length(row_stats)
+    end
+
+    pareto_plot(plot, r_points;
+        label="R*",
+        markershape=:hexagon,
+        marker_z=nothing,
+        color=:green,
+    )
+
+    # Hurwicz
+    hur_points = []
+    for (ih, hrow_stats) in enumerate(hur_stats)
+        # 1st and last are
+        if ih == 1 || ih == length(hur_stats)
+            continue
+        end
+
+        for (j,stat) in enumerate(hrow_stats)
+            alpha = @sprintf "%.2f" alphas[ih]
+            line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
+                model=j>1 ? "" : "\$H($(alpha))\$\n")
+            push!(table_rows, line)
+            push!(table_rows, "\\hline")
+            push!(table_rows, "\\hline")
+
+            if nondom_idx[i+j]
+                point = (stat.min, stat.max)
+                push!(pareto_solutions, point)
+                push!(hur_points, point)
+            end
+        end
+
+        i += length(hrow_stats)
+    end
+
+    pareto_plot(plot, hur_points;
+        label="Hurwicz",
+        markershape=:star5,
+        marker_z=nothing,
+        color=:purple,
+    )
+
+    # Save the results table
+    table_path = "$(dirpath)/$(name)_results.txt"
+    table_content = join(table_rows, "\n")
+    open(table_path, "w") do file
+        write(file, table_content)
+    end
+
+
+    # Plot the frontier
+    front = sort(pareto_solutions)
+    plot_front(plot, front)
+
+    # Final plot styling
+    xlabel = "Minimal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
+    plt.xlabel!(plot, xlabel)
+    ylabel = "Maximal cost" * (isnothing(scale) ? "" : " $(scalefmt)")
+    plt.ylabel!(plot, ylabel)
+    plt.plot!(plot,
+        size=(1000,750),
+        left_margin=5mm,
+        legend_font_pointsize=12,
+        tickfontsize=12,
+        guidefontsize=14,
+        colorbar_title="\$\\Gamma^d\$",
+        colorbar_titlefontsize=14,
+    )
+
+    if isnothing(name)
+        println("Can't show plots interactively.")
+    else
+        plt.savefig(plot, "$(dirpath)/$(name)_pareto.pdf")
+        plt.savefig(plot, "$(dirpath)/$(name)_pareto.png")
+    end
 end
 
 function combined_hist(
@@ -532,15 +697,17 @@ function pareto_plot(
     label,
     marker_z,
     markershape,
+    color=nothing,
 )
-    xs,ys = collect.(zip(points...))
+    xs,ys = length(points)== 0 ?
+        ([],[]) : collect.(zip(points...))
     plt.plot!(plot, xs, ys, seriestype=:scatter,
         marker_z=marker_z,
         markershape=markershape,
         markersize=8,
         markerstrokewidth=1,
         label=label,
-        color=:Spectral,
+        color=!isnothing(color) ? color : :Spectral,
     )
 end
 
@@ -1044,6 +1211,7 @@ function run(;make_optimizer=LM.Utils.default_optimizer, directory="results")
         histgammas=[2,4,6,10],
         directory,
     )
+
     experiments("15_31_1", "data/gen/15_31_1.dat";
         make_optimizer=make_optimizer,
         histgammas=[2,5,8,10,13],

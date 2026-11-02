@@ -375,11 +375,12 @@ function stats_table_row(row, gamma; model=nothing, skipnl=false)
 end
 
 function nondom_summary_row(row, gamma, nondom; model=nothing, skipnl=false)
+    vals = collect(row)
     line = join([
         isnothing(model) ? "" : model,
         "$(gamma)",
-        (format_nondom(sprint_2f(val), nondom) for val in row[begin:begin+1])...,
-        (sprint_2f(val) for val in row[begin+2:end])...,
+        (format_nondom(sprint_2f(val), nondom) for val in vals[begin:begin+1])...,
+        (sprint_2f(val) for val in vals[begin+2:end])...,
     ], " & ")
 
     nl = skipnl ? "" : " \\\\"
@@ -391,7 +392,7 @@ function get_nondom_minmax_id(all_sol)
     idx = [false for _ in all_sol]
     observ = [(i,x.min,x.max) for (i,x) in enumerate(all_sol)]
 
-    obs = sort(obs, by=(t -> (t[2], t[3])))
+    obs = sort(observ, by=(t -> (t[2], t[3])))
     valx = -Inf
     valy = Inf
 
