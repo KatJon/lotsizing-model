@@ -82,7 +82,7 @@ function result_summary(
 
     det_points = []
     if nondom_idx[i]
-        point = (det_stats.min, det_stats.max)
+        point = (det_stats.min, det_stats.max) ./ (isnothing(scale) ? 1 : scale)
         push!(pareto_solutions, point)
         push!(det_points, point)
     end
@@ -104,7 +104,7 @@ function result_summary(
         push!(table_rows, "\\hline")
 
         if nondom_idx[i+j]
-            point = (stat.min, stat.max)
+            point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
             push!(pareto_solutions, point)
             push!(pes_points, point)
         end
@@ -129,7 +129,7 @@ function result_summary(
         push!(table_rows, "\\hline")
 
         if nondom_idx[i+j]
-            point = (stat.min, stat.max)
+            point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
             push!(pareto_solutions, point)
             push!(opt_points, point)
         end
@@ -156,7 +156,7 @@ function result_summary(
             push!(table_rows, "\\hline")
 
             if nondom_idx[i+j]
-                point = (stat.min, stat.max)
+                point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
                 push!(pareto_solutions, point)
                 push!(r_points, point)
             end
@@ -189,7 +189,7 @@ function result_summary(
             push!(table_rows, "\\hline")
 
             if nondom_idx[i+j]
-                point = (stat.min, stat.max)
+                point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
                 push!(pareto_solutions, point)
                 push!(hur_points, point)
             end
@@ -1103,6 +1103,7 @@ end #hurwicz_pareto
 function experiments(name,path;
     histgammas=nothing,
     make_optimizer=LM.Utils.default_optimizer,
+    N = 10000,
     directory
 )
     println("# Experiment \"$(name)\"")
@@ -1110,7 +1111,6 @@ function experiments(name,path;
     mkpath(dirpath)
     inst = LM.load_instance(path)
 
-    N = 10000
     println("### Preparing sample lead times")
     samples = Instance.weighted_sampling(inst, N; ignore_budget=true)
 
@@ -1209,12 +1209,14 @@ function run(;make_optimizer=LM.Utils.default_optimizer, directory="results")
     experiments("10_21_1", "data/gen/10_21_1.dat";
         make_optimizer=make_optimizer,
         histgammas=[2,4,6,10],
+        N = 10_000,
         directory,
     )
 
     experiments("15_31_1", "data/gen/15_31_1.dat";
         make_optimizer=make_optimizer,
         histgammas=[2,5,8,10,13],
+        N = 100_000,
         directory,
     )
 end #run
