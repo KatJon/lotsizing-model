@@ -1159,6 +1159,16 @@ function batch_experiment(name,path;
     println("### Preparing sample lead times")
     samples = Instance.weighted_sampling(inst, N; ignore_budget=true)
 
+    println("### Combined histogram R* and Hurwicz")
+        combined_hist(inst, samples;
+            name=name,
+            gammas=histgammas,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+            make_optimizer=make_optimizer,
+            dirpath,
+        )
+
     println("### Preparing bicriterial R* plots with Pareto front")
         pareto_front_R(inst, samples;
             name=name,
