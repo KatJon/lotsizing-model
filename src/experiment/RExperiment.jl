@@ -41,12 +41,46 @@ function pes_value(
     return objective_value(model)
 end
 
+function result_summary(
+    det_stats,
+    pes_stats,
+    opt_stats,
+    r_stats,
+    hur_stats,
+    ;
+    name=nothing,
+    NBOUNDS=7,
+    gammas=nothing,
+    scale=nothing,
+    scalefmt=nothing,
+    dirpath,
+    alphas,
+    rstring,
+)
+    all_sol = [
+        det_stats,
+        pes_stats...,
+        vcat(r_stats...)...,
+        opt_stats...,
+        vcat(hur_stats[begin+1:end-1]...)...,
+    ]
 
-function combined_hist_R(
+    nondom_idx = ExperimentUtils.get_nondom_minmax_id(all_sol)
+
+    table_rows = []
+
+    i = 1
+    line = ExperimentUtils.nondom_summary_row(det_stats, "-", nondom_idx[i];model="\$\\textsc{Nominal}\$\n")
+
+    i+=1
+end
+
+function combined_hist(
     inst::LotSizingInstance,
     samples,
     ;
     name=nothing,
+    NBOUNDS=7,
     gammas=nothing,
     scale=nothing,
     scalefmt=nothing,
@@ -64,9 +98,9 @@ function combined_hist_R(
     inst_interval = @set inst.uncertainty=Uncertainty.Model(Uncertainty.Interval, nothing)
     pes_bound = pes_value(inst_interval; make_optimizer)
 
-    NBOUNDS = 5
-    rbounds = LinRange(pes_bound, 1.5*pes_bound, NBOUNDS)
-    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, NBOUNDS)]
+    RBOUNDS = NBOUNDS-2
+    rbounds = LinRange(pes_bound, 1.5*pes_bound, RBOUNDS)
+    rstring = [@sprintf "%.2f" rb for rb in LinRange(1.0, 1.5, RBOUNDS)]
 
     N = length(samples)
 
@@ -109,7 +143,7 @@ function combined_hist_R(
         row_costs = []
         row_stats = []
 
-        cachepath="$(name)_hist_R_$(NBOUNDS)-$(i)"
+        cachepath="$(name)_hist_R_$(RBOUNDS)-$(i)"
         RSOL = with_file_cache(cachepath;typ=Float64) do
             A = zeros(Float64, length(gammas), inst.T)
 
@@ -343,37 +377,23 @@ function combined_hist_R(
     else
         plt.savefig(allhist, "$(dirpath)/$(name)_RG1_combined_hist.pdf")
     end
-end #combined_hist_R
 
-function combined_hist_hurwicz(
-    inst::LotSizingInstance,
-    samples,
-    ;
-    name=nothing,
-    gammas=nothing,
-    NBOUNDS=7,
-    alphas=reverse(LinRange(0,1,NBOUNDS)),
-    scale=nothing,
-    scalefmt=nothing,
-    make_optimizer=LM.Utils.default_optimizer,
-    dirpath
-)
-    if isnothing(scale) != isnothing(scalefmt)
-        throw("Both scale and scalefmt need to be provided")
-    end
-
-    if isnothing(gammas)
-        gammas = 1:inst.T
-    end
+    #==================================#
+    # HURWICZ
+    #==================================#
 
     N = length(samples)
+    HBOUNDS=NBOUNDS
+    alphas=reverse(LinRange(0,1,HBOUNDS))
 
     table_rows = []
     hcosts = []
+    hur_stats = []
     for (i,alpha) in enumerate(alphas)
         row_costs = []
+        row_stats = []
 
-        cachepath="$(name)_hist_hur_$(NBOUNDS)-$(i)"
+        cachepath="$(name)_hist_hur_$(HBOUNDS)-$(i)"
         SOL = with_file_cache(cachepath;typ=Float64) do
             A = zeros(Float64, length(gammas), inst.T)
 
@@ -394,16 +414,18 @@ function combined_hist_hurwicz(
             costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
 
             stats = ExperimentUtils.experiment_stats(costs)
+
             line = ExperimentUtils.stats_table_row(stats, gammas[j],
                 model=j>1 ? nothing : "\$H($(@sprintf "%.2f" alpha))\$\n"
             )
 
             push!(table_rows, line)
-
             push!(row_costs, costs)
+            push!(row_stats, stats)
         end
 
         push!(hcosts, row_costs)
+        push!(hur_stats, row_stats)
     end
 
     table_path = "$(dirpath)/$(name)_hur_combined_stats.txt"
@@ -486,7 +508,23 @@ function combined_hist_hurwicz(
     else
         plt.savefig(allhist, "$(dirpath)/$(name)_hur_combined_hist.pdf")
     end
-end #combined_hist_hurwicz
+
+    result_summary(
+        det_stats,
+        pes_stats,
+        opt_stats,
+        r_stats,
+        hur_stats,
+        ;
+        name,
+        dirpath,
+        gammas,
+        scale,
+        scalefmt,
+        alphas,
+        rstring,
+    )
+end #combined_hist
 
 function pareto_plot(
     plot, points,
@@ -898,7 +936,7 @@ end #hurwicz_pareto
 function experiments(name,path;
     histgammas=nothing,
     make_optimizer=LM.Utils.default_optimizer,
-    directory="results"
+    directory
 )
     println("# Experiment \"$(name)\"")
     dirpath="$(directory)/$(name)"
@@ -909,18 +947,8 @@ function experiments(name,path;
     println("### Preparing sample lead times")
     samples = Instance.weighted_sampling(inst, N; ignore_budget=true)
 
-    println("### Combined histogram R* GammaD")
-        combined_hist_R(inst, samples;
-            name=name,
-            gammas=histgammas,
-            scale=1e5,
-            scalefmt="\$\\cdot 10^5\$",
-            make_optimizer=make_optimizer,
-            dirpath,
-        )
-
-    println("### Combined histogram Hurwicz")
-        combined_hist_hurwicz(inst, samples;
+    println("### Combined histogram R* and Hurwicz")
+        combined_hist(inst, samples;
             name=name,
             gammas=histgammas,
             scale=1e5,
@@ -950,10 +978,66 @@ function experiments(name,path;
     println("Done.")
 end
 
+function batch_experiment(name,path;
+    histgammas=nothing,
+    make_optimizer=LM.Utils.default_optimizer,
+    directory
+)
+    println("# Experiment \"$(name)\"")
+    dirpath="$(directory)/$(name)"
+    mkpath(dirpath)
+    inst = LM.load_instance(path)
+
+    N = 10000
+    println("### Preparing sample lead times")
+    samples = Instance.weighted_sampling(inst, N; ignore_budget=true)
+
+    println("### Preparing bicriterial R* plots with Pareto front")
+        pareto_front_R(inst, samples;
+            name=name,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+            make_optimizer=make_optimizer,
+            dirpath,
+        )
+
+    println("### Preparing bicriterial Hurwicz plots with Pareto front")
+        hurwicz_pareto(inst, samples;
+            name=name,
+            scale=1e5,
+            scalefmt="\$\\cdot 10^5\$",
+            make_optimizer=make_optimizer,
+            dirpath
+        )
+end
+
+function run_large(;make_optimizer=LM.Utils.default_optimizer, directory="results/other")
+    mkpath(directory)
+    println("Results will be placed in the directory `$(directory)`")
+
+    batch10 = ["10_21_$(i)" for i in 2:20]
+    for name in batch10
+        batch_experiment(name, "data/gen/$(name).dat";
+            make_optimizer=make_optimizer,
+            histgammas=[2,4,6,10],
+            directory,
+        )
+    end
+
+    batch15 = ["15_31_$(i)" for i in 2:20]
+    for name in batch15
+        batch_experiment(name, "data/gen/$(name).dat";
+            make_optimizer=make_optimizer,
+            histgammas=[2,5,8,10,13],
+            directory,
+        )
+    end
+end
+
 function run(;make_optimizer=LM.Utils.default_optimizer, directory="results")
     mkpath(directory)
 
-    println("Results will be placed in the directory `results`")
+    println("Results will be placed in the directory `$(directory)`")
 
     experiments("10_21_1", "data/gen/10_21_1.dat";
         make_optimizer=make_optimizer,

@@ -362,27 +362,6 @@ function format_nondom(str, nondominated)
         "\\textbf{$(str)}"
 end
 
-function save_stats(path, stats; index_name="index")
-    open(path, "w") do file
-        write(file, "$(index_name), min, max, mean, median, stddev, perc90\n")
-
-        for row in stats
-            i,min,max,mean,median,stddev,perc90,nondominated = row
-
-            line = join([
-                "$(i)",
-                "$(sprint_2f(min))",
-                "$(sprint_2f(max))",
-                "$(sprint_2f(mean))",
-                "$(sprint_2f(median))",
-                "$(sprint_2f(stddev))",
-                "$(sprint_2f(perc90))",
-            ], ", ")
-            write(file, "$(line)\n")
-        end
-    end
-end #save_stats
-
 function stats_table_row(row, gamma; model=nothing, skipnl=false)
     line = join([
         isnothing(model) ? "" : model,
@@ -393,6 +372,38 @@ function stats_table_row(row, gamma; model=nothing, skipnl=false)
     nl = skipnl ? "" : " \\\\"
 
     return "$(line)$(nl)"
+end
+
+function nondom_summary_row(row, gamma, nondom; model=nothing, skipnl=false)
+    line = join([
+        isnothing(model) ? "" : model,
+        "$(gamma)",
+        (format_nondom(sprint_2f(val), nondom) for val in row[begin:begin+1])...,
+        (sprint_2f(val) for val in row[begin+2:end])...,
+    ], " & ")
+
+    nl = skipnl ? "" : " \\\\"
+
+    return "$(line)$(nl)"
+end
+
+function get_nondom_minmax_id(all_sol)
+    idx = [false for _ in all_sol]
+    observ = [(i,x.min,x.max) for (i,x) in enumerate(all_sol)]
+
+    obs = sort(obs, by=(t -> (t[2], t[3])))
+    valx = -Inf
+    valy = Inf
+
+    for (i,vmin,vmax) in obs
+        if vmin > valx && vmax < valy
+            idx[i]=true
+            valx=vmin
+            valy=vmax
+        end
+    end
+
+    return idx
 end
 
 function pareto_front(observations)
