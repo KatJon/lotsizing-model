@@ -78,7 +78,6 @@ function result_summary(
         model="\$\\textsc{Nominal}\$\n")
     push!(table_rows, line)
     push!(table_rows, "\\hline")
-    push!(table_rows, "\\hline")
 
     det_points = []
     if nondom_idx[i]
@@ -100,8 +99,6 @@ function result_summary(
         line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
             model=j>1 ? "" : "\$\\textsc{Min-Max}\$\n")
         push!(table_rows, line)
-        push!(table_rows, "\\hline")
-        push!(table_rows, "\\hline")
 
         if nondom_idx[i+j]
             point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
@@ -109,6 +106,7 @@ function result_summary(
             push!(pes_points, point)
         end
     end
+    push!(table_rows, "\\hline")
 
     pareto_plot(plot, pes_points;
         label="Min-Max",
@@ -125,8 +123,6 @@ function result_summary(
         line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
             model=j>1 ? "" : "\$\\textsc{Min-Min}\$\n")
         push!(table_rows, line)
-        push!(table_rows, "\\hline")
-        push!(table_rows, "\\hline")
 
         if nondom_idx[i+j]
             point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
@@ -134,6 +130,7 @@ function result_summary(
             push!(opt_points, point)
         end
     end
+    push!(table_rows, "\\hline")
 
     pareto_plot(plot, opt_points;
         label="Min-Min",
@@ -152,8 +149,6 @@ function result_summary(
             line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
                 model=j>1 ? "" : "\$R^*($(rstring[ir]))\$\n")
             push!(table_rows, line)
-            push!(table_rows, "\\hline")
-            push!(table_rows, "\\hline")
 
             if nondom_idx[i+j]
                 point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
@@ -164,6 +159,7 @@ function result_summary(
 
         i += length(row_stats)
     end
+    push!(table_rows, "\\hline")
 
     pareto_plot(plot, r_points;
         label="R*",
@@ -185,8 +181,6 @@ function result_summary(
             line = ExperimentUtils.nondom_summary_row(stat, gammas[j], nondom_idx[i+j];
                 model=j>1 ? "" : "\$H($(alpha))\$\n")
             push!(table_rows, line)
-            push!(table_rows, "\\hline")
-            push!(table_rows, "\\hline")
 
             if nondom_idx[i+j]
                 point = (stat.min, stat.max) ./ (isnothing(scale) ? 1 : scale)
@@ -197,6 +191,7 @@ function result_summary(
 
         i += length(hrow_stats)
     end
+    push!(table_rows, "\\hline")
 
     pareto_plot(plot, hur_points;
         label="Hurwicz",
