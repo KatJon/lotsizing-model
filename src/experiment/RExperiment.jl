@@ -90,7 +90,7 @@ function result_summary(
         label="Nominal",
         markershape=:circle,
         marker_z=nothing,
-        color=:blue,
+        color=:red,
     )
 
     # MinMax
@@ -112,7 +112,7 @@ function result_summary(
         label="Min-Max",
         markershape=:diamond,
         marker_z=nothing,
-        color=:yellow,
+        color=:green,
     )
 
     i += length(pes_stats)
@@ -136,7 +136,7 @@ function result_summary(
         label="Min-Min",
         markershape=:square,
         marker_z=nothing,
-        color=:red,
+        color=:orchid,
     )
 
     i += length(opt_stats)
@@ -158,14 +158,14 @@ function result_summary(
         end
 
         i += length(row_stats)
+        push!(table_rows, "\\hline")
     end
-    push!(table_rows, "\\hline")
 
     pareto_plot(plot, r_points;
         label="R*",
         markershape=:hexagon,
         marker_z=nothing,
-        color=:green,
+        color=:yellow,
     )
 
     # Hurwicz
@@ -190,14 +190,14 @@ function result_summary(
         end
 
         i += length(hrow_stats)
+        push!(table_rows, "\\hline")
     end
-    push!(table_rows, "\\hline")
 
     pareto_plot(plot, hur_points;
         label="Hurwicz",
         markershape=:star5,
         marker_z=nothing,
-        color=:purple,
+        color=:blue,
     )
 
     # Save the results table
@@ -267,8 +267,11 @@ function combined_hist(
     all_plots = []
     ymax = 0
 
+    # Min-Max
+
     pes_costs = []
     pes_stats = []
+    pes_exact = []
     cachepath="$(name)_hist_minmax"
     MINMAXSOL = with_file_cache(cachepath;typ=Float64) do
         A = zeros(Float64, length(gammas), inst.T)
@@ -292,16 +295,22 @@ function combined_hist(
         stats = ExperimentUtils.experiment_stats(costs)
         push!(pes_stats, stats)
 
+        push!(pes_exact, ExperimentUtils.get_cost_bounds(inst, xs))
+
         push!(pes_costs, costs)
     end
 
+    # R*
+
     r_costs = []
     r_stats = []
+    r_exact = []
     for (i,rbound) in enumerate(rbounds)
         inst1 = with_rbound(inst, rbound)
 
         row_costs = []
         row_stats = []
+        row_exact = []
 
         cachepath="$(name)_hist_R_$(RBOUNDS)-$(i)"
         RSOL = with_file_cache(cachepath;typ=Float64) do
@@ -327,16 +336,22 @@ function combined_hist(
             stats = ExperimentUtils.experiment_stats(costs)
             push!(row_stats, stats)
 
+            push!(row_exact, ExperimentUtils.get_cost_bounds(inst, xs))
+
             push!(row_costs, costs)
         end
 
         push!(r_stats, row_stats)
+        push!(r_exact, row_exact)
 
         push!(r_costs, row_costs)
     end
 
+    # Min-Min
+
     opt_costs = []
     opt_stats = []
+    opt_exact = []
 
     cachepath="$(name)_hist_minmin"
     MINMINSOL = with_file_cache(cachepath;typ=Float64) do
@@ -359,6 +374,8 @@ function combined_hist(
         costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
         stats = ExperimentUtils.experiment_stats(costs)
         push!(opt_stats, stats)
+
+        push!(opt_exact, ExperimentUtils.get_cost_bounds(inst, xs))
 
         push!(opt_costs, costs)
     end
@@ -386,10 +403,10 @@ function combined_hist(
     ys = collect(JuMP.value.(y))
     det_costs = [prod_lead_cost(inst,xs,ys,sample) for sample in samples]
     det_stats = ExperimentUtils.experiment_stats(det_costs)
+    det_exact = ExperimentUtils.get_cost_bounds(inst, xs)
 
     line = ExperimentUtils.stats_table_row(det_stats, "-", model="\$\\textsc{Nominal}\$\n")
     push!(table_rows, line)
-    push!(table_rows, "\\hline")
     push!(table_rows, "\\hline")
 
     for (i,row) in enumerate(pes_stats)
@@ -398,7 +415,6 @@ function combined_hist(
 
         push!(table_rows, line)
     end
-    push!(table_rows, "\\hline")
     push!(table_rows, "\\hline")
 
     for (j, row_stats) in enumerate(r_stats)
@@ -410,7 +426,6 @@ function combined_hist(
             push!(table_rows, line)
         end
 
-        push!(table_rows, "\\hline")
         push!(table_rows, "\\hline")
     end
 
@@ -549,9 +564,11 @@ function combined_hist(
     table_rows = []
     hcosts = []
     hur_stats = []
+    hur_exact = []
     for (i,alpha) in enumerate(alphas)
         row_costs = []
         row_stats = []
+        row_exact = []
 
         cachepath="$(name)_hist_hur_$(HBOUNDS)-$(i)"
         SOL = with_file_cache(cachepath;typ=Float64) do
@@ -578,14 +595,18 @@ function combined_hist(
             line = ExperimentUtils.stats_table_row(stats, gammas[j],
                 model=j>1 ? nothing : "\$H($(@sprintf "%.2f" alpha))\$\n"
             )
-
             push!(table_rows, line)
-            push!(row_costs, costs)
+
             push!(row_stats, stats)
+
+            push!(row_exact, ExperimentUtils.get_cost_bounds(inst, xs))
+
+            push!(row_costs, costs)
         end
 
         push!(hcosts, row_costs)
         push!(hur_stats, row_stats)
+        push!(hur_exact, row_exact)
     end
 
     table_path = "$(dirpath)/$(name)_hur_combined_stats.txt"
@@ -669,6 +690,7 @@ function combined_hist(
         plt.savefig(allhist, "$(dirpath)/$(name)_hur_combined_hist.pdf")
     end
 
+    # Sample summary
     result_summary(
         det_stats,
         pes_stats,
@@ -684,6 +706,24 @@ function combined_hist(
         alphas,
         rstring,
     )
+
+    # Exact summary
+    result_summary(
+        det_exact,
+        pes_exact,
+        opt_exact,
+        r_exact,
+        hur_exact,
+        ;
+        name="$(name)_exact",
+        dirpath,
+        gammas,
+        scale,
+        scalefmt,
+        alphas,
+        rstring,
+    )
+
 end #combined_hist
 
 function pareto_plot(
@@ -1143,6 +1183,7 @@ end
 function batch_experiment(name,path;
     histgammas=nothing,
     make_optimizer=LM.Utils.default_optimizer,
+    N = 10_000,
     directory
 )
     println("# Experiment \"$(name)\"")
@@ -1150,7 +1191,6 @@ function batch_experiment(name,path;
     mkpath(dirpath)
     inst = LM.load_instance(path)
 
-    N = 10000
     println("### Preparing sample lead times")
     samples = Instance.weighted_sampling(inst, N; ignore_budget=true)
 
@@ -1192,6 +1232,7 @@ function run_large(;make_optimizer=LM.Utils.default_optimizer, directory="result
         batch_experiment(name, "data/gen/$(name).dat";
             make_optimizer=make_optimizer,
             histgammas=[2,4,6,10],
+            N = 10_000,
             directory,
         )
     end
@@ -1201,6 +1242,7 @@ function run_large(;make_optimizer=LM.Utils.default_optimizer, directory="result
         batch_experiment(name, "data/gen/$(name).dat";
             make_optimizer=make_optimizer,
             histgammas=[2,5,8,10,13],
+            N = 100_000,
             directory,
         )
     end

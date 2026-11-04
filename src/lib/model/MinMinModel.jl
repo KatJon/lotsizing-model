@@ -28,7 +28,7 @@ Returns: tuple of
 * flow - array of continuous variables denoting flow between graph nodes.
 """
 function minmin_variables(inst::LotSizingInstance, model, graph)
-    @variable(model, 
+    @variable(model,
         rho[t=prod_periods(inst), j=feasible_arrival_times(inst, t)], Bin)
     @variable(model,
         flow[u=OptG.eachnode(graph), v=OptG.eachnode(graph); OptG.is_arc(graph, u, v)] >= 0)
@@ -83,7 +83,7 @@ function minmin_constraints(
 
     # (44)
     @constraint(model, [
-            t=skip_last(prod_periods(inst)), 
+            t=skip_last(prod_periods(inst)),
             j=feasible_arrival_times(inst, t),
             k=feasible_arrival_times(inst, t+1);
             k < j
@@ -98,7 +98,7 @@ function minmin_constraints(
                 t in prod_periods(inst),
                 j in feasible_arrival_times(inst, t)
                 if j != t + inst.common_lead_time
-            ) 
+            )
         )
     # (45) Gamma^c
     elseif inst.uncertainty.type == Uncertainty.GammaC
@@ -193,9 +193,9 @@ function create_minmin_model(
     # (49)
     @constraint(model, [t=prod_periods(inst)],
         x[t] <= inst.production_capacity[t] * y[t])
-    
+
     far_future_backordering = flow[OptG.isnode(graph), OptG.ivnode(graph, inst.Tplus)]
-    
+
     return model, x, y, rho, far_future_backordering, flow, graph
 end #create_minmin_model
 
@@ -205,14 +205,15 @@ function opt_scenario_cost(
     ;
     make_optimizer = Utils.default_optimizer,
     time_limit = 5*60,
+    eps = 1e-7,
 )
     model = JuMP.Model(make_optimizer)
     set_time_limit_sec(model, time_limit)
 
-    ys = [(x > 0 ? 1.0 : 0.0) for x in xs]
+    ys = [(x <= eps ? 0.0 : 1.0) for x in xs]
 
     graph = OptG.create_minmin_graph(inst)
-    
+
     ## Variables
     rho,flow = minmin_variables(inst, model, graph)
 
@@ -226,7 +227,7 @@ function opt_scenario_cost(
 end #opt_scenario_cost
 
 get_opt_arrivals(inst::LotSizingInstance, rho) = [
-    findfirstvalue(j -> value(rho[t,j]) == 1, feasible_arrival_times(inst, t)) 
+    findfirstvalue(j -> value(rho[t,j]) == 1, feasible_arrival_times(inst, t))
         for t in prod_periods(inst)]
 
 end #MinMinModel

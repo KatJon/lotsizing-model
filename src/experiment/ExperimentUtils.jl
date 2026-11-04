@@ -283,7 +283,8 @@ function get_cost_bounds(inst::LotSizingInstance, xs::Vector{Float64})
     mmax = MinMaxModel.pes_scenario_cost(inst, xs)
     JuMP.optimize!(mmax)
 
-    return JuMP.objective_value.((mmin,mmax))
+    (min,max) = JuMP.objective_value.((mmin,mmax))
+    return (min=min, max=max)
 end #get_cost_bounds
 
 function rejection_sample_arrivals(
